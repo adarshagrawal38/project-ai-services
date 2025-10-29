@@ -31,3 +31,13 @@ func CapitalizeAndFormat(s string) string {
 func BoolPtr(v bool) *bool {
 	return &v
 }
+
+// flattenArray takes a 2D slice and returns a 1D slice with all values
+func FlattenArray[T interface{ ~int | ~float64 | ~string }](arr [][]T) []T {
+	flatArr := []T{}
+
+	for _, row := range arr {
+		flatArr = append(flatArr, row...)
+	}
+	return flatArr
+}

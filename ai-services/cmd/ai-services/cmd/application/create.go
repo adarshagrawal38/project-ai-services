@@ -4,13 +4,18 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
+	"sync"
+	"text/template"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/project-ai-services/ai-services/internal/pkg/cli/helpers"
+	"github.com/project-ai-services/ai-services/internal/pkg/runtime"
 	"github.com/project-ai-services/ai-services/internal/pkg/runtime/podman"
+	"github.com/project-ai-services/ai-services/internal/pkg/utils"
 )
 
 const (
@@ -58,8 +63,16 @@ var createCmd = &cobra.Command{
 			return fmt.Errorf("failed to parse the templates: %w", err)
 		}
 
-		params := map[string]any{
-			"AppName": appName,
+		metadataFilePath := applicationTemplatesPath + appTemplateName + "/metadata.yaml"
+
+		// load metadata.yml to fetch the dependencies list
+		appMetadata, err := helpers.LoadMetdata(metadataFilePath)
+		if err != nil {
+			return fmt.Errorf("failed to read app metadata: %w", err)
+		}
+
+		if err := verifyPodTemplateExists(tmpls, appMetadata); err != nil {
+			return fmt.Errorf("failed to verify pod template: %w", err)
 		}
 
 		// podman connectivity
@@ -70,56 +83,9 @@ var createCmd = &cobra.Command{
 
 		// Loop through all pod templates, render and run kube play
 		cmd.Printf("Total Pod Templates to be processed: %d\n", len(tmpls))
-		for name, tmpl := range tmpls {
-			cmd.Printf("Processing template: %s...\n", name)
 
-			var rendered bytes.Buffer
-			if err := tmpl.Execute(&rendered, params); err != nil {
-				return fmt.Errorf("failed to execute template %s: %v", name, err)
-			}
-
-			// Wrap the bytes in a bytes.Reader
-			reader := bytes.NewReader(rendered.Bytes())
-
-			kubeReport, err := runtime.CreatePod(reader)
-			if err != nil {
-				return fmt.Errorf("failed pod creation: %w", err)
-			}
-
-			cmd.Printf("Successfully ran podman kube play for %s\n", name)
-
-			for _, pod := range kubeReport.Pods {
-				cmd.Printf("Performing Pod Readiness check...: %s\n", pod.ID)
-				for _, containerID := range pod.Containers {
-					cmd.Printf("Doing Container Readiness check...: %s\n", containerID)
-
-					// getting the Start Period set for a container
-					startPeriod, err := helpers.FetchContainerStartPeriod(runtime, containerID)
-					if err != nil {
-						return fmt.Errorf("fetching container start period failed: %w", err)
-					}
-
-					if startPeriod == -1 {
-						cmd.Println("No container health check is set. Hence skipping readiness check")
-						continue
-					}
-
-					// configure readiness timeout by appending start period with additional extra timeout
-					readinessTimeout := startPeriod + extraContainerReadinessTimeout
-
-					cmd.Printf("Setting the Waiting Readiness Timeout: %s\n", readinessTimeout)
-
-					if err := helpers.WaitForContainerReadiness(runtime, containerID, readinessTimeout); err != nil {
-						return fmt.Errorf("readiness check failed!: %w", err)
-					}
-					cmd.Printf("Container: %s is ready\n", containerID)
-					cmd.Println("-------")
-				}
-				cmd.Printf("Pod: %s has been successfully deployed and ready!\n", pod.ID)
-				cmd.Println("-------")
-			}
-
-			cmd.Println("-------\n-------")
+		if err := executePodTemplates(runtime, appName, appMetadata.PodTemplateExecutions, tmpls); err != nil {
+			return err
 		}
 
 		return nil
@@ -143,4 +109,122 @@ func fetchAppTemplateIndex(appTemplateNames []string, templateName string) int {
 	}
 
 	return appTemplateIndex
+}
+
+func verifyPodTemplateExists(tmpls map[string]*template.Template, appMetadata *helpers.AppMetadata) error {
+	flattenPodTemplateExecutions := utils.FlattenArray(appMetadata.PodTemplateExecutions)
+
+	if len(flattenPodTemplateExecutions) != len(tmpls) {
+		return errors.New("number of values specified in podTemplateExecutions under metadata.yml is mismatched. Please ensure all the pod template file names are specified")
+	}
+
+	// Make sure the podTemplateExecution mentioned in metadata.yaml is valid (corresponding pod template is present)
+	for _, podTemplate := range flattenPodTemplateExecutions {
+		if _, ok := tmpls[podTemplate]; !ok {
+			return fmt.Errorf("value: %s specified in podTemplateExecutions under metadata.yml is invalid. Please ensure corresponding template file exists", podTemplate)
+		}
+	}
+
+	return nil
+}
+
+func executePodTemplates(runtime runtime.Runtime, appName string, podTemplateExecutions [][]string, tmpls map[string]*template.Template) error {
+	fmt.Println("Templates: ", tmpls)
+
+	params := map[string]any{
+		"AppName": appName,
+	}
+
+	// looping over each layer of podTemplateExecutions
+	for i, layer := range podTemplateExecutions {
+		fmt.Printf("\n Executing Layer %d: %v\n", i+1, layer)
+		fmt.Println("-------")
+		var wg sync.WaitGroup
+		errCh := make(chan error, len(layer))
+
+		// for each layer, fetch all the pod Template Names and do the pod deploy
+		for _, podTemplateName := range layer {
+			wg.Add(1)
+			go func(t string) {
+				defer wg.Done()
+				fmt.Printf("Processing template: %s...\n", podTemplateName)
+
+				podTemplate := tmpls[podTemplateName]
+
+				var rendered bytes.Buffer
+				if err := podTemplate.Execute(&rendered, params); err != nil {
+					errCh <- err
+				}
+
+				// Wrap the bytes in a bytes.Reader
+				reader := bytes.NewReader(rendered.Bytes())
+
+				if err := deployPodAndReadinessCheck(runtime, podTemplateName, reader); err != nil {
+					errCh <- err
+				}
+			}(podTemplateName)
+		}
+
+		wg.Wait()
+		close(errCh)
+
+		// collect all errors for this layer
+		var errs []error
+		for e := range errCh {
+			errs = append(errs, fmt.Errorf("layer %d: %w", i+1, e))
+		}
+
+		// If an error exist for a given layer, then return (do not process further layers)
+		if len(errs) > 0 {
+			return errors.Join(errs...)
+		}
+
+		fmt.Printf("Layer %d completed\n", i+1)
+	}
+
+	return nil
+}
+
+func deployPodAndReadinessCheck(runtime runtime.Runtime, name string, body io.Reader) error {
+
+	kubeReport, err := runtime.CreatePod(body)
+	if err != nil {
+		return fmt.Errorf("failed pod creation: %w", err)
+	}
+
+	fmt.Printf("Successfully ran podman kube play for %s\n", name)
+
+	for _, pod := range kubeReport.Pods {
+		fmt.Printf("Performing Pod Readiness check...: %s\n", pod.ID)
+		for _, containerID := range pod.Containers {
+			fmt.Printf("Doing Container Readiness check...: %s\n", containerID)
+
+			// getting the Start Period set for a container
+			startPeriod, err := helpers.FetchContainerStartPeriod(runtime, containerID)
+			if err != nil {
+				return fmt.Errorf("fetching container start period failed: %w", err)
+			}
+
+			if startPeriod == -1 {
+				fmt.Println("No container health check is set. Hence skipping readiness check")
+				continue
+			}
+
+			// configure readiness timeout by appending start period with additional extra timeout
+			readinessTimeout := startPeriod + extraContainerReadinessTimeout
+
+			fmt.Printf("Setting the Waiting Readiness Timeout: %s\n", readinessTimeout)
+
+			if err := helpers.WaitForContainerReadiness(runtime, containerID, readinessTimeout); err != nil {
+				return fmt.Errorf("readiness check failed!: %w", err)
+			}
+			fmt.Printf("Container: %s is ready\n", containerID)
+			fmt.Println("-------")
+		}
+		fmt.Printf("Pod: %s has been successfully deployed and ready!\n", pod.ID)
+		fmt.Println("-------")
+	}
+
+	fmt.Println("-------\n-------")
+	return nil
 }

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/containers/podman/v5/libpod/define"
+	"gopkg.in/yaml.v3"
+
 	"github.com/project-ai-services/ai-services/assets"
 	"github.com/project-ai-services/ai-services/internal/pkg/runtime"
 )
@@ -59,7 +61,9 @@ func LoadAllTemplates(rootPath string) (map[string]*template.Template, error) {
 		if err != nil {
 			return fmt.Errorf("parse %s: %w", path, err)
 		}
-		tmpls[path] = t
+
+		// key should be just the template file name (Eg:- pod1.yaml.tmpl)
+		tmpls[strings.TrimPrefix(path, fmt.Sprintf("%s/", rootPath))] = t
 		return nil
 	})
 	return tmpls, err
@@ -121,4 +125,22 @@ func FetchContainerStartPeriod(runtime runtime.Runtime, containerNameOrId string
 	healthCheck := containerStats.Config.Healthcheck
 
 	return healthCheck.StartPeriod, nil
+}
+
+type AppMetadata struct {
+	// TODO: Include other variables too
+	PodTemplateExecutions [][]string `yaml:"podTemplateExecutions"`
+}
+
+func LoadMetdata(path string) (*AppMetadata, error) {
+	data, err := assets.ApplicationFS.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read metadata: %w", err)
+	}
+
+	var appMetadata AppMetadata
+	if err := yaml.Unmarshal(data, &appMetadata); err != nil {
+		return nil, err
+	}
+	return &appMetadata, nil
 }
