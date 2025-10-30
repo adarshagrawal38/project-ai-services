@@ -1,10 +1,10 @@
 REGISTRY?=icr.io/ai-services-private
-IMAGE=docling
-TAG?=2.36.0
+IMAGE=rag-base
+TAG?=v0.0.1
 
 CONTAINER_BUILDER?=podman
 build:
-	$(CONTAINER_BUILDER) build --build-arg DOCLING_VERSION=${TAG} -t $(REGISTRY)/$(IMAGE):$(TAG) .
+	$(CONTAINER_BUILDER) build -t $(REGISTRY)/$(IMAGE):$(TAG) .
 .PHONY: build
 
 push:
