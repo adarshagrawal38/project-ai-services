@@ -5,7 +5,48 @@ metadata:
   labels:
     ai-services.io/application: "{{ .AppName }}"
 spec:
+  volumes:
+    - name: dshm
+      emptyDir:
+        medium: Memory
+        sizeLimit: 64Gi
   containers:
+    - name: instruct
+      image: icr.io/ibmaiu_internal/ppc64le/dd2/spyre-vllm:v1.0.1
+      volumeMounts:
+        - mountPath: /dev/shm
+          name: dshm
+      livenessProbe:
+        httpGet:
+          path: /health
+          port: 8000
+        initialDelaySeconds: 600
+        periodSeconds: 30
+        timeoutSeconds: 5
+        failureThreshold: 3
+      env:
+        - name: VLLM_MODEL_PATH
+          value: "ibm-granite/granite-3.3-8b-instruct"
+        - name: TORCH_SENDNN_CACHE_ENABLE
+          value: "1"
+        - name: VLLM_SPYRE_REQUIRE_PRECOMPILED_DECODERS
+          value: "1"
+        - name: VLLM_AIU_PCIE_IDS
+          value: "0381:50:00.0 0382:60:00.0 0383:70:00.0 0384:80:00.0"
+        - name: VLLM_SPYRE_USE_CB
+          value: "1"
+        - name: MAX_MODEL_LEN
+          value: "32768"
+        - name: MAX_BATCH_SIZE
+          value: "32"
+      resources:
+        requests:
+          podman.io/device=/dev/vfio: 4
+          memory: "200Gi"
+        limits:
+          memory: "200Gi"
+      ports:
+        - containerPort: 8000
     - name: embedding
       image: icr.io/ppc64le-oss/vllm-ppc64le:0.9.1
       command: ["/bin/sh", "-c"]
