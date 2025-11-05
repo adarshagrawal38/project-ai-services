@@ -86,57 +86,9 @@ Available checks to skip:
 				logger.Warn("⚠️  WARNING: Skipping validation checks", zap.Strings("skipped", skipChecks))
 			}
 
-			var validationErrors []error
-			// TODO: add hints for each validation error
-
-			// 1. Root check
-			if !skip[CheckRoot] {
-				if err := rootCheck(); err != nil {
-					return err
-				}
-			}
-
-			// 2. OS and version check
-			if !skip[CheckRHEL] {
-				if err := validateOS(); err != nil {
-					validationErrors = append(validationErrors, err)
-				}
-			}
-
-			// 3. Validate RHN registration
-			if !skip[CheckRHN] {
-				if err := validateRHNRegistration(); err != nil {
-					validationErrors = append(validationErrors, err)
-				}
-			}
-
-			// 4. IBM Power Version Validation
-			if !skip[CheckPower11] {
-				if err := validatePowerVersion(); err != nil {
-					validationErrors = append(validationErrors, err)
-				}
-			}
-
-			// TODO: 5. RHAIIS Licence Validation
-			if !skip[CheckRHAIIS] {
-				if err := validateRHAIISLicense(); err != nil {
-					validationErrors = append(validationErrors, err)
-				}
-			}
-
-			// 6. Check if Spyre is attached to the system
-			if !skip["spyre"] {
-				if err := validateSpyreAttachment(); err != nil {
-					validationErrors = append(validationErrors, err)
-				}
-			}
-
-			if len(validationErrors) > 0 {
-				logger.Error("❌ Validation failed with errors:")
-				for i, err := range validationErrors {
-					logger.Error(fmt.Sprintf("  %d. %s", i+1, err.Error()))
-				}
-				return fmt.Errorf("%d validation check(s) failed", len(validationErrors))
+			err := RunValidateCmd(skip)
+			if err != nil {
+				return fmt.Errorf("❌ Bootstrap validation failed: %w", err)
 			}
 
 			logger.Info("✅ All validations passed")
@@ -149,6 +101,63 @@ Available checks to skip:
 	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Enable verbose output for debugging")
 
 	return cmd
+}
+
+func RunValidateCmd(skip map[string]bool) error {
+	var validationErrors []error
+	// TODO: add hints for each validation error
+
+	// 1. Root check
+	if !skip[CheckRoot] {
+		if err := rootCheck(); err != nil {
+			// exit from this func since root permission is required to validate other steps
+			return err
+		}
+	}
+
+	// 2. OS and version check
+	if !skip[CheckRHEL] {
+		if err := validateOS(); err != nil {
+			validationErrors = append(validationErrors, err)
+		}
+	}
+
+	// 3. Validate RHN registration
+	if !skip[CheckRHN] {
+		if err := validateRHNRegistration(); err != nil {
+			validationErrors = append(validationErrors, err)
+		}
+	}
+
+	// 4. IBM Power Version Validation
+	if !skip[CheckPower11] {
+		if err := validatePowerVersion(); err != nil {
+			validationErrors = append(validationErrors, err)
+		}
+	}
+
+	// TODO: 5. RHAIIS Licence Validation
+	if !skip[CheckRHAIIS] {
+		if err := validateRHAIISLicense(); err != nil {
+			validationErrors = append(validationErrors, err)
+		}
+	}
+
+	// 6. Check if Spyre is attached to the system
+	if !skip["spyre"] {
+		if err := validateSpyreAttachment(); err != nil {
+			validationErrors = append(validationErrors, err)
+		}
+	}
+
+	if len(validationErrors) > 0 {
+		logger.Error("❌ Validation failed with errors:")
+		for i, err := range validationErrors {
+			logger.Error(fmt.Sprintf("  %d. %s", i+1, err.Error()))
+		}
+		return fmt.Errorf("%d validation check(s) failed", len(validationErrors))
+	}
+	return nil
 }
 
 func parseSkipChecks(skipChecks []string) map[string]bool {

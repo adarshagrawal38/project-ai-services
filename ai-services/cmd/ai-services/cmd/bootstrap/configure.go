@@ -21,34 +21,9 @@ func configureCmd() *cobra.Command {
 
 			logger.Info("Running bootstrap configuration...")
 
-			if err := rootCheck(); err != nil {
-				return err
-			}
-
-			// 1. Install and configure Podman if not done
-			// 1.1 Install Podman
-			if _, err := validators.Podman(); err != nil {
-				// setup podman socket and enable service
-				logger.Info("Podman not installed. Installing Podman...")
-				if err := installPodman(); err != nil {
-					return err
-				}
-			}
-
-			// 1.2 Configure Podman
-			if err := validators.PodmanHealthCheck(); err != nil {
-				logger.Info("Podman not configured. Configuring Podman...")
-				if err := setupPodman(); err != nil {
-					return err
-				}
-			} else {
-				logger.Info("✅ Podman already configured")
-			}
-			// 2. Spyre cards – run servicereport tool to validate and repair spyre configurations
-			if err := runServiceReport(); err != nil {
-				return err
-			} else {
-				logger.Info("✅ Spyre cards configuration validated successfully.")
+			err := RunConfigureCmd()
+			if err != nil {
+				return fmt.Errorf("❌ Bootstrap configuration failed: %w", err)
 			}
 
 			logger.Info("✅ Bootstrap configuration completed successfully.")
@@ -56,6 +31,40 @@ func configureCmd() *cobra.Command {
 		},
 	}
 	return cmd
+}
+
+func RunConfigureCmd() error {
+	if err := rootCheck(); err != nil {
+		return err
+	}
+
+	// 1. Install and configure Podman if not done
+	// 1.1 Install Podman
+	if _, err := validators.Podman(); err != nil {
+		// setup podman socket and enable service
+		logger.Info("Podman not installed. Installing Podman...")
+		if err := installPodman(); err != nil {
+			return err
+		}
+	}
+
+	// 1.2 Configure Podman
+	if err := validators.PodmanHealthCheck(); err != nil {
+		logger.Info("Podman not configured. Configuring Podman...")
+		if err := setupPodman(); err != nil {
+			return err
+		}
+	} else {
+		logger.Info("✅ Podman already configured")
+	}
+	// 2. Spyre cards – run servicereport tool to validate and repair spyre configurations
+	if err := runServiceReport(); err != nil {
+		return err
+	} else {
+		logger.Info("✅ Spyre cards configuration validated successfully.")
+	}
+
+	return nil
 }
 
 func runServiceReport() error {

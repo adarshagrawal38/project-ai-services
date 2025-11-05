@@ -14,6 +14,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/project-ai-services/ai-services/cmd/ai-services/cmd/bootstrap"
 	"github.com/project-ai-services/ai-services/internal/pkg/cli/helpers"
 	"github.com/project-ai-services/ai-services/internal/pkg/constants"
 	"github.com/project-ai-services/ai-services/internal/pkg/runtime"
@@ -49,10 +50,26 @@ var createCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		appName := args[0]
 
+		// Validate the LPAR before creating the application
+		// Configuring --skip-check to nil, since we require every validation step from here
+		cmd.Printf("Validating the LPAR environment before creating application '%s'...\n", appName)
+		err := bootstrap.RunValidateCmd(nil)
+		if err != nil {
+			return fmt.Errorf("❌ Bootstrap validation failed: %w", err)
+		}
+
+		// Configure the LPAR before creating the application
+		cmd.Printf("Configuring the LPAR")
+		err = bootstrap.RunConfigureCmd()
+		if err != nil {
+			return fmt.Errorf("❌ Bootstrap configuration failed: %w", err)
+		}
+
+		// Proceed to create application
 		cmd.Printf("Creating application '%s' using template '%s'\n", appName, templateName)
 
 		// set SMT level to target value, assuming it is running with root privileges (part of validation in bootstrap)
-		err := setSMTLevel()
+		err = setSMTLevel()
 		if err != nil {
 			return fmt.Errorf("failed to set SMT level: %w", err)
 		}
