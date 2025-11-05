@@ -5,6 +5,7 @@ import (
 
 	"github.com/project-ai-services/ai-services/cmd/ai-services/cmd/application/image"
 	"github.com/project-ai-services/ai-services/cmd/ai-services/cmd/application/model"
+	"github.com/project-ai-services/ai-services/internal/pkg/vars"
 )
 
 // ApplicationCmd represents the application command
@@ -23,4 +24,6 @@ func init() {
 	ApplicationCmd.AddCommand(stopCmd)
 	ApplicationCmd.AddCommand(startCmd)
 	ApplicationCmd.AddCommand(model.ModelCmd)
+	ApplicationCmd.PersistentFlags().StringVar(&vars.ToolImage, "tool-image", vars.ToolImage, "Tool image to use for downloading the model(only for the development purpose)")
+	ApplicationCmd.PersistentFlags().MarkHidden("tool-image")
 }

@@ -30,6 +30,7 @@ var (
 	extraContainerReadinessTimeout = 5 * time.Minute
 	templateName                   string
 	envMutex                       sync.Mutex
+	downloadModels                 bool
 )
 
 var createCmd = &cobra.Command{
@@ -110,6 +111,23 @@ var createCmd = &cobra.Command{
 			if err := validateSpyreCardRequirements(reqSpyreCardsCount, actualSpyreCardsCount); err != nil {
 				return err
 			}
+		}
+
+		// Download models if flag is set to true(default: true)
+		if downloadModels {
+			cmd.Println("Downloading models as part of application creation...")
+			models, err := helpers.ListModels(appTemplateName)
+			if err != nil {
+				return err
+			}
+			cmd.Println("Downloaded Models in application template", templateName, ":")
+			for _, model := range models {
+				err := helpers.DownloadModel(model, vars.ModelDirectory)
+				if err != nil {
+					return fmt.Errorf("failed to download model: %w", err)
+				}
+			}
+			cmd.Println("Model download completed.")
 		}
 
 		// ---- ! ----
@@ -242,6 +260,7 @@ func getTargetSMTLevel() (*int, error) {
 func init() {
 	createCmd.Flags().StringVarP(&templateName, "template-name", "t", "", "Template name to use (required)")
 	createCmd.MarkFlagRequired("template-name")
+	createCmd.Flags().BoolVarP(&downloadModels, "download-models", "d", true, "Download models during application creation(location: /var/lib/ai-services/models/)")
 }
 
 // fetchAppTemplateIndex -> Returns the index of app template if exists, otherwise -1

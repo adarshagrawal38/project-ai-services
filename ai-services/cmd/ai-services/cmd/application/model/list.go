@@ -1,16 +1,12 @@
 package model
 
 import (
-	"strings"
+	"fmt"
 
 	"github.com/spf13/cobra"
 )
 
 var templateName string
-
-const (
-	applicationTemplatesPath = "applications/"
-)
 
 var listCmd = &cobra.Command{
 	Use:   "list",
@@ -28,9 +24,9 @@ func init() {
 }
 
 func list(cmd *cobra.Command) error {
-	models, err := models()
+	models, err := models(templateName)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list the models, err: %w", err)
 	}
 	cmd.Println("Models in application template", templateName, ":")
 	for _, model := range models {
@@ -38,18 +34,4 @@ func list(cmd *cobra.Command) error {
 	}
 
 	return nil
-}
-
-// fetchAppTemplateIndex -> Returns the index of app template if exists, otherwise -1
-func fetchAppTemplateIndex(appTemplateNames []string, templateName string) int {
-	appTemplateIndex := -1
-
-	for index, appTemplateName := range appTemplateNames {
-		if strings.EqualFold(appTemplateName, templateName) {
-			appTemplateIndex = index
-			break
-		}
-	}
-
-	return appTemplateIndex
 }

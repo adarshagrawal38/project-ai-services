@@ -1,16 +1,13 @@
 package model
 
 import (
-	"errors"
 	"fmt"
-	"strings"
+	"slices"
 
 	"github.com/project-ai-services/ai-services/internal/pkg/cli/helpers"
-	"github.com/project-ai-services/ai-services/internal/pkg/utils"
+	"github.com/project-ai-services/ai-services/internal/pkg/cli/templates"
 	"github.com/spf13/cobra"
 )
-
-var modelAnnotationKey = "ai-services.io/model"
 
 var ModelCmd = &cobra.Command{
 	Use:   "model",
@@ -27,49 +24,15 @@ func init() {
 	ModelCmd.AddCommand(downloadCmd)
 }
 
-func models() ([]string, error) {
-	// Fetch all the application Template names
-	appTemplateNames, err := helpers.FetchApplicationTemplatesNames()
+func models(template string) ([]string, error) {
+	tp := templates.NewEmbedTemplateProvider(templates.EmbedOptions{})
+	apps, err := tp.ListApplications()
 	if err != nil {
-		return nil, fmt.Errorf("failed to list templates: %w", err)
+		return nil, fmt.Errorf("failed to list the applications")
 	}
 
-	var appTemplateName string
-
-	if index := fetchAppTemplateIndex(appTemplateNames, templateName); index == -1 {
-		return nil, errors.New("provided template name is wrong. Please provide a valid template name")
-	} else {
-		appTemplateName = appTemplateNames[index]
+	if !slices.Contains(apps, template) {
+		return nil, fmt.Errorf("application template %s does not exist", template)
 	}
-
-	applicationPodTemplatesPath := applicationTemplatesPath + appTemplateName
-
-	tmpls, err := helpers.LoadAllTemplates(applicationPodTemplatesPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse the templates: %w", err)
-	}
-
-	// Fetch all the models from the pod annotations
-	models := func(podSpec helpers.PodSpec) []string {
-		modelAnnotations := []string{}
-		for key, value := range helpers.FetchPodAnnotations(podSpec) {
-			if strings.HasPrefix(key, modelAnnotationKey) {
-				modelAnnotations = append(modelAnnotations, value)
-			}
-		}
-		return modelAnnotations
-	}
-
-	modelList := []string{}
-	for _, podTemplateFileName := range utils.ExtractMapKeys(tmpls) {
-		podTemplateFilePath := applicationPodTemplatesPath + "/" + podTemplateFileName
-
-		// load the pod Template
-		podSpec, err := helpers.LoadPodTemplate(podTemplateFilePath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load pod Template: %s with error: %w", podTemplateFilePath, err)
-		}
-		modelList = append(modelList, models(*podSpec)...)
-	}
-	return modelList, nil
+	return helpers.ListModels(template)
 }

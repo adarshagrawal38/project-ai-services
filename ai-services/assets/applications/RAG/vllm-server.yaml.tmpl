@@ -15,9 +15,17 @@ spec:
       emptyDir:
         medium: Memory
         sizeLimit: 64Gi
+    - name: models
+      hostPath:
+        path: "/var/lib/ai-services/models"
+        type: Directory
   containers:
     - name: instruct
       image: icr.io/ibmaiu_internal/ppc64le/dd2/spyre-vllm:v1.0.1
+      command: ["/bin/sh", "-c"]
+      args: [
+          "/home/senuser/container-scripts/vllm_start.sh --served-model-name ibm-granite/granite-3.3-8b-instruct"
+      ]
       volumeMounts:
         - mountPath: /dev/shm
           name: dshm
@@ -31,7 +39,7 @@ spec:
         failureThreshold: 3
       env:
         - name: VLLM_MODEL_PATH
-          value: "ibm-granite/granite-3.3-8b-instruct"
+          value: "/models/ibm-granite/granite-3.3-8b-instruct"
         - name: TORCH_SENDNN_CACHE_ENABLE
           value: "1"
         - name: VLLM_SPYRE_REQUIRE_PRECOMPILED_DECODERS
@@ -58,11 +66,15 @@ spec:
           memory: "200Gi"
       ports:
         - containerPort: 8000
+      volumeMounts:
+        - mountPath: /models:Z
+          name: models
+          readOnly: true
     - name: embedding
       image: icr.io/ppc64le-oss/vllm-ppc64le:0.9.1
       command: ["/bin/sh", "-c"]
       args: [
-          "vllm serve ibm-granite/granite-embedding-278m-multilingual --port 8001"
+          "vllm serve /models/ibm-granite/granite-embedding-278m-multilingual --served-model-name ibm-granite/granite-embedding-278m-multilingual --port 8001"
       ]
       livenessProbe:
         httpGet:
@@ -79,11 +91,15 @@ spec:
           memory: "10Gi"
       ports:
         - containerPort: 8001
+      volumeMounts:
+        - mountPath: /models:Z
+          name: models
+          readOnly: true
     - name: reranker
       image: icr.io/ppc64le-oss/vllm-ppc64le:0.9.1
       command: ["/bin/sh", "-c"]
       args: [
-          "vllm serve BAAI/bge-reranker-v2-m3 --port 8002"
+          "vllm serve /models/BAAI/bge-reranker-v2-m3 --served-model-name BAAI/bge-reranker-v2-m3 --port 8002"
       ]
       livenessProbe:
         httpGet:
@@ -100,3 +116,7 @@ spec:
           memory: "10Gi"
       ports:
         - containerPort: 8002
+      volumeMounts:
+        - mountPath: /models:Z
+          name: models
+          readOnly: true
