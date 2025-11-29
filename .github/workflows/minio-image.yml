@@ -67,7 +67,7 @@ jobs:
           repository: ${{ github.repository }}
           number: ${{ github.event.pull_request.number }}
           id: trivy-scan-result
-          message: "## Vulnerability Scan Results\n<details><summary>Details</summary>\n\n\`\`\`\nXYZ\n\`\`\`\n</details>"
+          message: "## Vulnerability Scan Results\n<details><summary>Details</summary>\n\n```\nXYZ\n```\n</details>"
           append: true
       
       - name: Fail the build if vulnerabilities found
