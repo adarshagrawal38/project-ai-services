@@ -51,7 +51,7 @@ jobs:
       #   run: cat trivy-result.txt
 
       - name: Format Trivy Scan Result
-        if: ${{ steps.trivy.outcome == 'failure' }}
+        # if: ${{ steps.trivy.outcome == 'failure' }}
         id: trivy-repprt
         run: |
           {
