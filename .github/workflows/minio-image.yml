@@ -47,7 +47,7 @@ jobs:
           output: trivy-result.txt
         continue-on-error: true
       
-      - name: Trivy Scan Result
+      - name: Log trivy scan result
         run: cat trivy-result.txt
 
       - name: Format Trivy Scan Result
@@ -57,13 +57,13 @@ jobs:
             echo -e "## Vulnerability Scan Results\n<details><summary>Details</summary>\n\n\`\`\`\n$(cat trivy-result.txt)\n\`\`\`\n</details>" > formatted-trivy-result.md
           fi
       
-      - name: Comment PR with Trivy scan results
+      - name: Notify Vulnerabilities via PR Comment
         uses: marocchino/sticky-pull-request-comment@v2
         if: ${{ steps.trivy.outcome == 'failure' }}
         with:
           path: formatted-trivy-result.md
       
-      - name: Check if vulnerabilities exist
+      - name: Fail the build if vulnerabilities found
         if: ${{ steps.trivy.outcome == 'failure' }}
         run: |
           echo -e "Vulnerabilities found in the image. Failing the build."
