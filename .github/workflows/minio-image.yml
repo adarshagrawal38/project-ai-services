@@ -28,7 +28,6 @@ jobs:
         run: echo -e "Line 1\nLine 2\nLine 3" > trivy-result.txt
 
       - name: Trivy result
-        if: ${{ steps.trivy.outcome == 'failure' }}
         id: trivy-report
         run: |
           cat trivy-result.txt
@@ -37,7 +36,7 @@ jobs:
 
       - name: Notify Vulnerabilities via PR Comment
         uses: hasura/comment-progress@v2.3.0
-        if: ${{ steps.trivy.outcome == 'failure' }}
+        
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
