@@ -55,7 +55,7 @@ jobs:
         id: trivy-repprt
         run: |
           if [ -s trivy-result.txt ]; then
-            echo -e "## Vulnerability Scan Results\n<details><summary>Details</summary>\n\n\`\`\`\n$(cat trivy-result.txt)\n\`\`\`\n</details>" >>>> $GITHUB_OUTPUT
+            echo -e "## Vulnerability Scan Results\n<details><summary>Details</summary>\n\n\`\`\`\n$(cat trivy-result.txt)\n\`\`\`\n</details>" >> $GITHUB_OUTPUT
           fi
       
       - name: Notify Vulnerabilities via PR Comment
