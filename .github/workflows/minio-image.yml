@@ -31,8 +31,9 @@ jobs:
         id: trivy-report
         run: |
           cat trivy-result.txt
+          echo -e "## Vulnerability Scan Results\n<details><summary>Details</summary>\n\n\`\`\`\n$(cat trivy-result.txt)\n\`\`\`\n</details>" > formatted-trivy-result.md
           echo "result<<EOF" >> $GITHUB_OUTPUT
-          cat trivy-result.txt >> $GITHUB_OUTPUT
+          cat formatted-trivy-result.md >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Notify Vulnerabilities via PR Comment
