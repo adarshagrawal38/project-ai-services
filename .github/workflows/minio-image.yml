@@ -54,10 +54,11 @@ jobs:
         if: ${{ steps.trivy.outcome == 'failure' }}
         id: trivy-repprt
         run: |
-          if [ -s trivy-result.txt ]; then
-            echo -e "## Vulnerability Scan Results\n<details><summary>Details</summary>\n\n\`\`\`\n$(cat trivy-result.txt)\n\`\`\`\n</details>" >> $GITHUB_OUTPUT
-          fi
-      
+          {
+            echo "scan_result<<EOF"
+            echo -e "## Vulnerability Scan Results\n<details><summary>Details</summary>\n\n\`\`\`\n$(cat trivy-result.txt)\n\`\`\`\n</details>"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
       - name: Notify Vulnerabilities via PR Comment
         uses: hasura/comment-progress@v2.3.0
         if: ${{ steps.trivy.outcome == 'failure' }}
