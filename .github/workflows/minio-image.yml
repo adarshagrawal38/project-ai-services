@@ -67,8 +67,7 @@ jobs:
           number: ${{ github.event.pull_request.number }}
           id: trivy-scan-result
           message: ${{ steps.trivy-report.outputs.result }}
-          append: true
-      
+          
       - name: Fail the build if vulnerabilities found
         if: ${{ steps.trivy.outcome == 'failure' }}
         run: |
