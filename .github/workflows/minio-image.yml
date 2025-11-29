@@ -41,7 +41,7 @@ jobs:
         with:
           input: images/minio/${{ env.IMAGE_FILE_NAME }}
           format: table
-          severity: CRITICAL,HIGH,MEDIUM
+          severity: CRITICAL,HIGH,MEDIUM,LOW
           exit-code: 1
           ignore-unfixed: true
           output: trivy-result.txt
@@ -52,16 +52,21 @@ jobs:
 
       - name: Format Trivy Scan Result
         if: ${{ steps.trivy.outcome == 'failure' }}
+        id: trivy-repprt
         run: |
           if [ -s trivy-result.txt ]; then
-            echo -e "## Vulnerability Scan Results\n<details><summary>Details</summary>\n\n\`\`\`\n$(cat trivy-result.txt)\n\`\`\`\n</details>" > formatted-trivy-result.md
+            echo -e "## Vulnerability Scan Results\n<details><summary>Details</summary>\n\n\`\`\`\n$(cat trivy-result.txt)\n\`\`\`\n</details>" >>>> $GITHUB_OUTPUT
           fi
       
       - name: Notify Vulnerabilities via PR Comment
-        uses: marocchino/sticky-pull-request-comment@v2
+        uses: hasura/comment-progress@v2.3.0
         if: ${{ steps.trivy.outcome == 'failure' }}
         with:
-          path: formatted-trivy-result.md
+          number: ${{ github.event.pull_request.number }}
+          body-file: formatted-trivy-result.md
+          id: trivy-scan-result
+          message: ${{ steps.trivy-repprt.outputs.content }}
+          append: true
       
       - name: Fail the build if vulnerabilities found
         if: ${{ steps.trivy.outcome == 'failure' }}
