@@ -48,7 +48,7 @@ jobs:
       #   continue-on-error: true
       
       - name: Create Trivy file
-        run: echo -e "line1\nline2\nline3" > trivy-result.txt
+        run: echo -e "line1\nline2\nline3\n line4" > trivy-result.txt
       - name: Trivy result
         # if: ${{ steps.trivy.outcome == 'failure' }}
         id: trivy-report
@@ -70,7 +70,7 @@ jobs:
           message: ${{ steps.trivy-report.outputs.result }}
       
       - name: Print out variable
-        run: echo "${{ steps.trivy-report.outputs.result }}"
+        run: echo -e "${{ steps.trivy-report.outputs.result }}"
           
       - name: Fail the build if vulnerabilities found
         if: ${{ steps.trivy.outcome == 'failure' }}
