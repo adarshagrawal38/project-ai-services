@@ -31,8 +31,7 @@ jobs:
         id: trivy-report
         run: |
           cat trivy-result.txt
-          echo -e "## Vulnerability Scan Results\n<details><summary>Details</summary>\n\n\`\`\`\n$(cat trivy-result.txt)\n\`\`\`\n</details>" > formatted-trivy-result.md
-          echo -e "result=$(cat formatted-trivy-result.md)" >> $GITHUB_OUTPUT
+          echo "result=$(cat trivy-result.txt)" >> $GITHUB_OUTPUT
 
       - name: Notify Vulnerabilities via PR Comment
         uses: hasura/comment-progress@v2.3.0
