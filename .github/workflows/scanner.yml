@@ -6,13 +6,13 @@ on:
       path:
         required: true
         type: string
-
-env:
-  IMAGE_FILE_NAME: image.tar
       skip-license-scan:
         required: false
         type: boolean
         default: false
+
+env:
+  IMAGE_FILE_NAME: image.tar
 
 env:
   IMAGE_FILE_NAME: image.tar
