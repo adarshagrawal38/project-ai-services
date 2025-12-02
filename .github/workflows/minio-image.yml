@@ -15,27 +15,124 @@ on:
 env:
   ICR_REGISTRY: icr.io
   ICR_NAMESPACE: ai-services-cicd
+  IMAGE_FILE_NAME: image.tar
 
 jobs:
-  build-publish-image:
-    name: Build and Publish Image
-    runs-on: ubuntu-24.04-ppc64le
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Build minio image
-        working-directory: images/minio
-        run: |
-          make build REGISTRY=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }}
-
-      - name: Publish minio image
-        working-directory: images/minio
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          make push REGISTRY=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }} REGISTRY_USER=${{ secrets.ICR_USERNAME }} REGISTRY_PASSWORD=${{ secrets.ICR_APIKEY }}
-
   scan:
     uses: ./.github/workflows/scanner.yml
     with:
       path: 'images/minio'
+    # name: License scan
+    # runs-on: ubuntu-latest
+    # steps:
+    #   - name: Checkout code
+    #     uses: actions/checkout@v5
+
+      
+    #   - name: Build minio image
+    #     working-directory: images/minio
+    #     run: |
+    #       make build REGISTRY=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }}
+    #       IMAGE_NAME=$(make image-name REGISTRY=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }} )
+    #       podman save > ${{ env.IMAGE_FILE_NAME }} $IMAGE_NAME
+      
+    #   - name: Trivy SBOM scan
+    #     id: trivy-sbom
+    #     uses: aquasecurity/trivy-action@0.33.1
+    #     with:
+    #       input: images/minio/${{ env.IMAGE_FILE_NAME }}
+    #       format: cyclonedx
+    #       output: minio-sbom-trivy.json
+      
+    #   - name: Enrich trivy SBOM with parlay
+    #     run: |
+    #       mkdir -p $HOME/bin
+    #       wget https://github.com/snyk/parlay/releases/download/v0.6.4/parlay_Linux_x86_64.tar.gz
+    #       tar -xzf parlay_Linux_x86_64.tar.gz
+    #       chmod +x parlay
+    #       mv parlay $HOME/bin
+    #       export PATH=$HOME/bin:$PATH
+    #       parlay --version
+    #       parlay ecosystems enrich minio-sbom-trivy.json | jq . > minio-parlay.json
+      
+    #   - name: Upload SBOM artifact
+    #     uses: actions/upload-artifact@v4
+    #     with:
+    #       name: sbom-json-artifact
+    #       path: |
+    #         minio-sbom-trivy.json
+    #         minio-parlay.json
+            
+    #   - name: Run python scripts
+    #     run: python .github/scripts/license_scan.py minio-sbom-trivy.json minio-parlay.json
+      
+      
+      
+  
+  build-publish-image:
+    name: Build and Publish Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      
+      # - name: Build minio image
+      #   working-directory: images/minio
+      #   run: |
+      #     make build REGISTRY=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }}
+
+      # - name: Save minio image to file
+      #   working-directory: images/minio
+      #   run: |
+      #     IMAGE_NAME=$(make image-name REGISTRY=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }} )
+      #     podman save > ${{ env.IMAGE_FILE_NAME }} $IMAGE_NAME
+
+      # - name: Trivy vulnerability scan
+      #   id: trivy
+      #   uses: aquasecurity/trivy-action@0.33.1
+      #   with:
+      #     input: images/minio/${{ env.IMAGE_FILE_NAME }}
+      #     format: table
+      #     severity: CRITICAL,HIGH,MEDIUM
+      #     exit-code: 1
+      #     ignore-unfixed: true
+      #     output: trivy-result.txt
+      #   continue-on-error: true
+      
+      
+      # - name: Create Trivy file
+      #   run: echo -e "line1\nline2\nline3\n line4" > trivy-result.txt
+      # - name: Trivy result
+      #   if: ${{ steps.trivy.outcome == 'failure' }}
+      #   id: trivy-report
+      #   run: |
+      #     cat trivy-result.txt
+      #     echo -e "## Vulnerability Scan Results\n<details><summary>Details</summary>\n\n\`\`\`\n$(cat trivy-result.txt)\n\`\`\`\n</details>" > formatted-trivy-result.md
+      #     echo "result<<EOF" >> $GITHUB_OUTPUT
+      #     cat formatted-trivy-result.md >> $GITHUB_OUTPUT
+      #     echo "EOF" >> $GITHUB_OUTPUT
+
+      # - name: Notify Vulnerabilities via PR Comment
+      #   uses: hasura/comment-progress@v2.3.0
+      #   if: ${{ steps.trivy.outcome == 'failure' }}
+      #   with:
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     repository: ${{ github.repository }}
+      #     number: ${{ github.event.pull_request.number }}
+      #     id: trivy-scan-result
+      #     message: ${{ steps.trivy-report.outputs.result }}
+      
+      # - name: Print out variable
+      #   run: echo -e "${{ steps.trivy-report.outputs.result }}"
+          
+      # - name: Fail the build if vulnerabilities found
+      #   if: ${{ steps.trivy.outcome == 'failure' }}
+      #   run: |
+      #     echo -e "Vulnerabilities found in the image. Failing the build."
+      #     exit 1
+          
+      # - name: Publish minio image
+      #   working-directory: images/minio
+      #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      #   run: |
+      #     make push REGISTRY=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }} REGISTRY_USER=${{ secrets.ICR_USERNAME }} REGISTRY_PASSWORD=${{ secrets.ICR_APIKEY }}

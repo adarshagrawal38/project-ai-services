@@ -1,0 +1,21 @@
+name: Scheduled CVE Scan
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  
+  workflow_dispatch:
+
+jobs:
+  minio:
+    uses: ./.github/workflows/scanner.yml
+    with:
+      path: 'images/minio'
+      skip-license-scan: true
+  
+  etcd:
+    uses: ./.github/workflows/scanner.yml
+    with:
+      path: 'images/etcd'
+      skip-license-scan: false
+
