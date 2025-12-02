@@ -13,9 +13,6 @@ on:
 
 env:
   IMAGE_FILE_NAME: image.tar
-
-env:
-  IMAGE_FILE_NAME: image.tar
   TRIVY_SBOM_FILE: trivy.json
   PARLAY_SBOM_FILE: parlay.json
   ICR_REGISTRY: icr.io
