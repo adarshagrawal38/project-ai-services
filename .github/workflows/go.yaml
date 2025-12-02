@@ -9,6 +9,7 @@ on:
   pull_request:
     paths:
       - 'ai-services/**'
+      - '.github/workflows/go.yml'
     branches:
       - main
 
@@ -43,3 +44,19 @@ jobs:
         working-directory: ai-services
         run: |
           GOOS=linux GOARCH=ppc64le make build
+  
+  cves:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+      
+      - name: Run trivy scan
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          scan-type: 'fs'
+          scan-ref: 'ai-services'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+      
+
