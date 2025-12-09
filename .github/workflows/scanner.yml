@@ -13,6 +13,10 @@ on:
         required: false
         type: boolean
         default: false
+      ignore-unfixed:
+        required: false
+        type: boolean
+        default: true
     secrets:
       ICR_USERNAME:
         required: false
@@ -61,4 +65,4 @@ jobs:
           format: table
           severity: CRITICAL,HIGH
           exit-code: 1
-          ignore-unfixed: true
+          ignore-unfixed: ${{ inputs.ignore-unfixed }}
