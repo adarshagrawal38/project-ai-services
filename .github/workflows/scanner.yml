@@ -4,10 +4,7 @@ on:
   workflow_call:
     inputs:
       path:
-        required: false
-        type: string
-      image:
-        required: false
+        required: true
         type: string
     secrets:
       ICR_USERNAME:
@@ -21,60 +18,13 @@ env:
   ICR_NAMESPACE: ai-services-cicd
 
 jobs:
-  # cves:
-  #   runs-on: ubuntu-24.04-ppc64le
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v5
-      
-  #     - name: Build image
-  #       working-directory: ${{ inputs.path }}
-  #       run: |
-  #         make build REGISTRY=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }} REGISTRY_USER=${{ secrets.ICR_USERNAME }} REGISTRY_PASSWORD=${{ secrets.ICR_APIKEY }}
-      
-  #     - name: Save image in file
-  #       run: |
-  #         IMAGE_NAME=$(podman images --format "{{.Repository}}:{{.Tag}}" | grep "${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }}" | head -n 1)
-  #         podman save > ${{ env.IMAGE_FILE_NAME }} $IMAGE_NAME
-
-  #     - name: Trivy vulnerability scan
-  #       uses: aquasecurity/trivy-action@0.33.1
-  #       with:
-  #         input: ${{ env.IMAGE_FILE_NAME }}
-  #         format: table
-  #         severity: CRITICAL,HIGH
-  #         exit-code: 1
-  #         ignore-unfixed: true
-  
   cves:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04-ppc64le
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
       
-      - name: Login
+      - name: Build image
+        working-directory: ${{ inputs.path }}
         run: |
-          podman login ${{ env.ICR_REGISTRY }} -u ${{ secrets.ICR_USERNAME }} -p ${{ secrets.ICR_APIKEY }}
-      
-      - name: pull image Tag
-        id: image-tag
-        run: |
-          TAG_VALUE=$(make latest-image-tag IMAGE=${{ inputs.image }} NAMESPACE=${{ env.ICR_NAMESPACE }})
-          echo "IMAGE_TAG=$TAG_VALUE" >> $GITHUB_OUTPUT
-          echo "Latest Image Tag: $TAG_VALUE"
-
-          IMAGE_NAME=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }}/${{ inputs.image }}:${TAG_VALUE}
-          echo "IMAGE_NAME=$IMAGE_NAME" >> $GITHUB_OUTPUT
-          echo "Image Name: $IMAGE_NAME"
-
-          podman pull $IMAGE_NAME
-          podman save > ${{ env.IMAGE_FILE_NAME }} $IMAGE_NAME
-
-      - name: Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@0.33.1
-        with:
-          input: ${{ env.IMAGE_FILE_NAME }}
-          format: table
-          severity: CRITICAL,HIGH
-          exit-code: 1
-          ignore-unfixed: true
+          make build REGISTRY=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }} REGISTRY_USER=${{ secrets.ICR_USERNAME }} REGISTRY_PASSWORD=${{ secrets.ICR_APIKEY }}
