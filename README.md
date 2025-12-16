@@ -1,6 +1,6 @@
 # AI-Services
 
-AI services, part of the IBM Open-Source AI Foundation for Power, deliver pre-built AI capabilities and integration with inferencing solutions like Red Hat AI Inference Server. Optimized for IBM Spyre™ on Power, they enable fast deployment and support models such as LLMs, embeddings, and re-rankers—helping enterprises scale AI efficiently.
+AI Services, part of the IBM Open-Source AI Foundation for Power, deliver pre-built AI capabilities and integration with inferencing solutions like Red Hat AI Inference Server. Optimized for IBM Spyre™ on Power, they enable fast deployment and support models such as LLMs, embeddings, and re-rankers—helping enterprises scale AI efficiently.
 
 ## 📘 Table of Contents
 
@@ -8,23 +8,27 @@ AI services, part of the IBM Open-Source AI Foundation for Power, deliver pre-bu
 
 - [**🌟 Introduction**](https://www.ibm.com/docs/aiservices?topic=services-introduction)
 
-- [**🛠️ Installation Guide**](https://www.ibm.com/docs/aiservices?topic=services-installation)
-
+- [**🛠️ Configuration and Installation**](https://www.ibm.com/docs/aiservices?topic=services-configuration-installation)
+  - [Prerequisites](https://www.ibm.com/docs/aiservices?topic=installation-prerequisites)
   - [Quick Start](#quick-start)
+  - [Set-up AI Services](https://www.ibm.com/docs/aiservices?topic=installation-setup-ai-services)
+  - [Configuring in Air-gapped Environment](https://www.ibm.com/docs/aiservices?topic=installation-configuring-air-gapped-environment)
+
+- [**🤖 RAG Chatbot**](https://www.ibm.com/docs/en/aiservices?topic=services-rag-chatbot)
+  - [Archtecture](https://www.ibm.com/docs/en/aiservices?topic=chatbot-architecture)
+  - [Setting up RAG Chatbot](https://www.ibm.com/docs/en/aiservices?topic=chatbot-setting-up-rag)
 
 - **💻 CLI Reference**
   - [Auto-completion](https://www.ibm.com/docs/aiservices?topic=reference-auto-completion)
   - [Commands](https://www.ibm.com/docs/aiservices?topic=reference-commands)
 
-- **🎓 Tutorials**
-  - [Installing in air-gapped environment](https://www.ibm.com/docs/aiservices?topic=tutorials-installing-in-air-gapped-environment)
-  - [Setting up RAG Chatbot](https://www.ibm.com/docs/aiservices?topic=tutorials-setting-up-rag-chatbot)
-
-- [**⚠️ Limitations**](https://www.ibm.com/docs/aiservices?topic=services-limitations)
-
 - [**🧯 Troubleshooting**](https://www.ibm.com/docs/aiservices?topic=services-troubleshooting)
 
 - [**❓ FAQ**](https://www.ibm.com/docs/aiservices?topic=services-faq)
+
+- [**⚠️ Limitations**](https://www.ibm.com/docs/aiservices?topic=services-limitations)
+
+- [**👩‍💻Developer Guide**](https://www.ibm.com/docs/en/aiservices?topic=services-developer-guide)
 
 - [**🚀 Contributing**](./CONTRIBUTING.md)
 
@@ -32,7 +36,7 @@ AI services, part of the IBM Open-Source AI Foundation for Power, deliver pre-bu
 
 ## Quick Start
 
-### Pull in AI-services binary
+### Pull in AI Services binary
 
 Download the latest ai-services binary from the [releases page](https://github.com/IBM/project-ai-services/releases). Use the following curl command to download it (replace `version` with the desired release tag):
 
@@ -46,7 +50,7 @@ $ sudo mv ai-services /usr/local/bin/
 
 ```bash
 % ai-services --help
-A CLI tool for managing AI services infrastructure.
+A CLI tool for managing AI Services infrastructure.
 
 Usage:
   ai-services [command]
