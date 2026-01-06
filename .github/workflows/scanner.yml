@@ -127,10 +127,12 @@ jobs:
           format: cyclonedx
           output: ${{ env.TRIVY_SBOM_FILE }}
 
+      - name: Uname
+        run: uname -m
       - name: Enrich trivy SBOM with parlay
         run: |
           mkdir -p $HOME/bin
-          wget https://github.com/snyk/parlay/releases/download/${{ env.PARLAY_VERSION }}/parlay_Linux_ppc64le.tar.gz
+          wget https://github.com/snyk/parlay/releases/download/${{ env.PARLAY_VERSION }}/parlay_Linux_x86_64.tar.gz
           tar -xzf parlay_Linux_ppc64le.tar.gz
           chmod +x parlay
           mv parlay $HOME/bin
