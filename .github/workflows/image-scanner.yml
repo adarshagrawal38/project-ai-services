@@ -4,6 +4,7 @@ on:
   schedule:
     - cron: '0 0 */2 * *'
 
+  pull_request:
   workflow_dispatch:
     inputs:
       skip-cves-scan:
@@ -23,7 +24,7 @@ jobs:
     with:
       path: 'images/minio'
       image: 'minio'
-      skip-image-build: true
+      skip-image-build: false
       ignore-unfixed: false
       skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan || false }}
       skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan || false }}
