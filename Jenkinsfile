@@ -6,11 +6,12 @@ pipeline {
             name: 'PR_NUMBER',
             description: 'Pull request number to build'
         )
-        string(
-            name: 'Applications',
-            description: 'Name of application to be deployed'
-        )
         stashedFile 'INGEST_DOC_FILE'
+    }
+
+    // Using options to allow one deployment at any given point of time.
+    options {
+        disableConcurrentBuilds()
     }
 
     stages {
@@ -21,11 +22,7 @@ pipeline {
                     if (!params.PR_NUMBER?.trim()) {
                         error('PR_NUMBER must be provided')
                     }
-                    if (!params.Applications?.trim()) {
-                        error('Application must be provided')
-                    }
                 }
-                sh "echo ${Applications}"
             }
         }
 
@@ -51,34 +48,41 @@ pipeline {
                 '''
             }
         }
-
-        stage('Process Ingest Doc file') {
-            steps {
-                script {
-                    unstash 'INGEST_DOC_FILE'
-                    
-                    sh 'ls -l'
-                    sh 'cat INGEST_DOC_FILE'
-                    sh 'mv INGEST_DOC_FILE /var/lib/ai-services/applications/rag-test/docs/doc.pdf'
-                }
+        
+        // Working on adding a poller to verify that no application is deployed on the machine.
+        // The user must trigger a cleaner job, which removes the application from the machine.
+        // Once the cleaner job completes, the poller stage will also complete.
+        // After that, deployment of the new application can start from the "Deploy" stage.
+        stage('Verify no app deployed') {
+            steps{
+                sh "./bin/ai-services application ps"
             }
         }
 
         stage('Deploy') {
             steps {
                 sh '''
-                    cd /root/adarsh/project-ai-services/ai-services
+                cd /root/adarsh/project-ai-services/ai-services
                     ./bin/ai-services application create rag-test -t rag-dev
                     podman pod ps
                 '''
             }
         }
+        stage('Process Ingest Doc file') {
+            steps {
+                script {
+                    unstash 'INGEST_DOC_FILE'
+                    
+                    sh 'mv INGEST_DOC_FILE /var/lib/ai-services/applications/rag-test/docs/doc.pdf'
+                }
+            }
+        }
         stage('Ingest') {
             steps {
                 sh '''
-                    echo "ingest DOC"
-                    cd /root/adarsh/project-ai-services/ai-services
-                    ./bin/ai-services application start rag-test --pod=rag-test--ingest-docs -y
+                echo "ingest DOC"
+                cd /root/adarsh/project-ai-services/ai-services
+                ./bin/ai-services application start rag-test --pod=rag-test--ingest-docs -y
                 '''
             }
         }
@@ -87,12 +91,15 @@ pipeline {
                 sh '''sleep 60s'''
             }
         }
+
         stage('Cleanup') {
             steps {
                 sh '''
-                    cd /root/adarsh/project-ai-services/ai-services
-                    ./bin/ai-services application stop rag-test
-                    podman pod ps
+                cd /root/adarsh/project-ai-services/ai-services
+                ./bin/ai-services application stop rag-test -y
+                ./bin/ai-services application delete rag-test -y
+                
+                podman pod ps
                 '''
             }
         }
