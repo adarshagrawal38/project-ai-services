@@ -5,28 +5,9 @@ pipeline {
         PROJECT_NAME = 'project-ai-services'
         AI_SERVICES_DIR = 'ai-services'
         AI_SERVICES_BINARY = './bin/ai-services'
-        MAX_APP_RUN_TIME_IN_MINS = '1'
-    }
 
-    parameters {
-        string(
-            name: 'CHECKOUT',
-            description: 'Pull request number or commit hash to build ai-services'
-        )
-        booleanParam(
-            name: 'BUILD_RAG_BACKEND',
-            description: 'Build rag backend image'
-        )
-        booleanParam(
-            name: 'BUILD_RAG_UI',
-            description: 'Build rag UI image'
-        )
-        choice(
-            name: 'APP',
-            choices: ['rag-dev', 'summarization'],
-            description: 'Select desired application which you want to deploy'
-        )
-        stashedFile 'INGEST_DOC_FILE'
+        // Holding pipeline for configured minutes, to allow user to complete testing
+        MAX_APP_RUN_TIME_IN_MINS = '120'
     }
 
     // Using options to allow one deployment at any given point of time.
@@ -55,8 +36,6 @@ pipeline {
             }
         }
 
-        
-
         stage('Build AI Services Binary') {
             steps {
                 sh '''
@@ -67,16 +46,19 @@ pipeline {
             }
         }
 
-        // Check if there is an existing application
+        // Delete app deployed by cicd pipeline
         stage('Delete App') {
             steps{
                 script {
+                    // Check if there is an existing application running
                     checkMachineStatus()
+
                     cleanupMachine()
                 }
             }
         }
 
+        // Build image locally, based on selection made by user
         stage('Build Selected Image') {
             steps {
                 script {
@@ -85,6 +67,7 @@ pipeline {
             }
         }
 
+        // Deploy selected application
         stage('Deployment') {
             steps {
                 sh '''
@@ -93,10 +76,11 @@ pipeline {
                 '''
             }
         }
+
+        // Ingest Docsument
         stage('Ingest DOC') {
             steps {
                 script {
-                
                 unstash 'INGEST_DOC_FILE'
                     
                 sh '''
@@ -110,12 +94,12 @@ pipeline {
             }
         }
 
-        stage('Test your PR') {
+        stage('Test Deployment') {
             steps{
                 script{
                     // Polling to check if app is deleted
                     for (int i = 0; i < env.MAX_APP_RUN_TIME_IN_MINS.toInteger() ; i++) {
-                        def appName = getRunningApp()
+                        def appName = runningAppName()
                         if (appName.isEmpty()) {
                             break
                         }
@@ -125,15 +109,15 @@ pipeline {
                 }
             }
         }
-
     }
 }
 
-def getRunningApp() {
-    def appName = ""
+// Returning app name which is running in the machine
+def runningAppName() {
+    String appName = ''
     dir("${env.PROJECT_NAME}/${env.AI_SERVICES_DIR}") {
         def apps = sh(
-            script: "./bin/ai-services application ps 2>&1",
+            script: './bin/ai-services application ps 2>&1',
             returnStdout: true
         ).trim()
         def outputLines = apps.readLines()
@@ -146,7 +130,7 @@ def getRunningApp() {
 }
 
 def repoCheckout(String branch) {
-    sh "git clone https://github.com/IBM/project-ai-services.git"
+    sh 'git clone https://github.com/IBM/project-ai-services.git'
     dir("${PROJECT_NAME}") {
         if (branch ==~ /^\d+$/) {
             println "Checking out to ${branch} PR number"
@@ -154,7 +138,7 @@ def repoCheckout(String branch) {
                 git fetch origin pull/${branch}/head:pr-${branch}
                 git checkout pr-${branch}
             """
-        }else {
+        } else {
             println "Checking out to ${branch} commit hash"
             sh "git rev-parse --verify ${branch}"
             sh "git checkout ${branch}"
@@ -164,13 +148,13 @@ def repoCheckout(String branch) {
 
 // Check if machine is free or not for deployment of application
 def checkMachineStatus() {
-    def appName = getRunningApp()
+    String appName = runningAppName()
     dir("${env.PROJECT_NAME}/${env.AI_SERVICES_DIR}") {
-        if (appName.isEmpty() ) {
-            println "No applications running in the machine."
-            println "Machine is in ready state for deployment."
-        }else {
-            if (!appName.contains("cicd")) {
+        if (appName == "") {
+            println 'No applications running in the machine.'
+            println 'Machine is in ready state for deployment.'
+        } else {
+            if (!appName.contains('cicd')) {
                 println "Please delete ${appName} to proceed for deployment"
                 error("Please delete ${appName} to proceed for deployment")
             }
@@ -178,43 +162,61 @@ def checkMachineStatus() {
     }
 }
 
+// Delete application deployed via CI/CD pipeline
 def cleanupMachine() {
-    def appName = getRunningApp()
+    String appName = runningAppName()
     if (appName.isEmpty()) {
         return
     }
     dir("${env.PROJECT_NAME}/${env.AI_SERVICES_DIR}") {
-        if (appName.contains("cicd")) {
+        if (appName.contains('cicd')) {
             println "Cleaning up ${appName} which is deployed by pipelines."
             sh "./bin/ai-services application delete ${appName} -y"
-        }else{
+        } else {
             println "Please delete ${appName} from the machine."
             error("Please delete ${appName} to proceed for deployment")
         }
     }
 }
 
+// Build image for app, as per user selection
 def buildAppImage(String appName) {
-    if (appName == "rag-dev") {
-        if(params.BUILD_RAG_BACKEND) {
-            def imageVal = buildImage(params.APP, "spyre-rag/src")
-            updateYamlFile(params.APP, imageVal, ".backend.image")
+    String imageName = ""
+    String containerFilePath = ""
+    String jsonPath = ""
+    
+    if (appName == 'rag-dev') {
+        String images = params.BUILD_IMAGE
+        println "Params: ${params.BUILD_IMAGE}"
+        if (images) {
+            String[] selectedImage = params.BUILD_IMAGE.split(',')
+            for (image in selectedImage) {
+                if (image == 'BUILD_RAG_UI') {
+                    imageName = 'rag-ui'
+                    containerFilePath = 'spyre-rag/ui'
+                    jsonPath = '.ui.image'
+                }
+                if (image == 'BUILD_RAG_BACKEND') {
+                    imageName = 'rag'
+                    containerFilePath = 'spyre-rag/src'
+                    jsonPath = '.backend.image'
+                }
+                String imageVal = buildImage(imageName, containerFilePath)
+                updateYamlFile(params.APP, imageVal, jsonPath)
+            }
+        } else {
+            println 'Images are not built locally for deployment.'
         }
-        if(params.BUILD_RAG_UI) {
-            def imageVal = buildImage("rag-ui", "spyre-rag/ui")
-            updateYamlFile(params.APP, imageVal, ".ui.image")
-        }
-    }else {
+    } else {
         error("Selected ${appName} not supported.")
     }
-    
 }
 
 def buildImage(String imageName, String containerFilePath) {
     String localRegistry = 'localhost'
     String imagePath = ""
     dir(env.PROJECT_NAME) {
-        sh "git rev-parse --short HEAD"
+        sh 'git rev-parse --short HEAD'
         dir(containerFilePath) {
             // Build image
             sh "make build REGISTRY=${localRegistry}"
@@ -232,12 +234,12 @@ def buildImage(String imageName, String containerFilePath) {
 // so that deployment of local image is done
 def updateYamlFile(String appName,String imageValue, String overridePath) {
     dir(env.PROJECT_NAME) {
-        def valuesFile = "ai-services/assets/applications/${appName}/values.yaml"
+        String valuesFile = "ai-services/assets/applications/${appName}/values.yaml"
         if (!fileExists(valuesFile)) {
             error("no values.yaml for ${appName}")
             return
         }
         sh "yq e '${overridePath} = \"${imageValue}\"' -i ${valuesFile}"
-        echo "Updated image values"
+        println "Values.yaml is updated in ${appName} for parameter ${overridePath} with value ${imageValue}"
     }
 }
