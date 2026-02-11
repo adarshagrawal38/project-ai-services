@@ -6,6 +6,7 @@ pipeline {
         REPO_FULL  = 'adarshagrawal38/project-ai-services'
         JENKINS_DEPLOY_JOB = 'deploy-ai-services'
     }
+    
     stages {
         stage('VVVV Environment variables') {
             when {not { changeRequest() } }  // Skip PR branches
