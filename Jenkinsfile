@@ -9,7 +9,7 @@ pipeline {
     
     stages {
         stage('VVVV Environment variables') {
-            when {not { changeRequest() } }  // Skip PR branches
+            // when {not { changeRequest() } }  // Skip PR branches
             steps {
                 script {
                     def branch = env.BRANCH_NAME
@@ -23,7 +23,7 @@ pipeline {
        }
         stage('VVVV: PR context Only') {
             // VVVV when { changeRequest() }  // Skip for non-PR branches
-            when { changeRequest() }  // Testing. Skip non-PR branches
+            // when { changeRequest() }  // Testing. Skip non-PR branches
             steps {
                 echo "Running for PR #${env.CHANGE_ID}"
                 echo "Running for PR #${env.BRANCH_NAME}"   // VVVV: will print null?
@@ -31,7 +31,7 @@ pipeline {
         }
         stage('VVVV: Branch context Only') {
             // VVVV when { changeRequest() }  // Skip for non-PR branches
-            when {not { changeRequest() } }  // Skip PR branches
+            // when {not { changeRequest() } }  // Skip PR branches
             steps {
                 echo "Running for PR #${env.CHANGE_ID}"  // VVVV: will print null
                 echo "Running for PR #${env.BRANCH_NAME}"
@@ -39,7 +39,7 @@ pipeline {
         }
         stage('Checkout & SHA') {
             // VVVV when { changeRequest() }
-            when { not { changeRequest() } }
+            // when { not { changeRequest() } }
             steps {
                 // Uses Branch Source SCM config (respecting PR strategy = HEAD)
                 checkout scm
@@ -51,7 +51,7 @@ pipeline {
         }
         stage('Post Manual Deployment Status') {
             // VVVV when { changeRequest() }
-            when { not { changeRequest() } }
+            // when { not { changeRequest() } }
             steps {
                 script {
                     // Prefer JENKINS_URL configured in: Manage Jenkins → System → Jenkins Location
