@@ -4,11 +4,13 @@ import time
 from glob import glob
 import argparse
 
+import common.db_utils as db
+from common.emb_utils import get_embedder
 from common.misc_utils import *
 
 def reset_db():
-    vector_store = MilvusVectorStore()
-    vector_store.reset_collection()
+    vector_store = db.get_vector_store()
+    vector_store.reset_index()
     logger.info(f"✅ DB Cleaned successfully!")
 
 def ingest(directory_path):
@@ -45,10 +47,10 @@ def ingest(directory_path):
 
     emb_model_dict, llm_model_dict, _ = get_model_endpoints()
     # Initialize/reset the database before processing any files
-    vector_store = MilvusVectorStore()
-    collection_name = vector_store._generate_collection_name()
+    vector_store = db.get_vector_store()
+    index_name = vector_store.index_name
     
-    out_path = setup_cache_dir(collection_name)
+    out_path = setup_cache_dir(index_name)
 
     start_time = time.time()
     combined_chunks, converted_pdf_stats = process_documents(
@@ -61,12 +63,11 @@ def ingest(directory_path):
 
     if combined_chunks:
         logger.info("Loading processed documents into DB")
-        # Insert data into Milvus
+        embedder = get_embedder(emb_model_dict['emb_model'], emb_model_dict['emb_endpoint'], emb_model_dict['max_tokens'])
+        # Insert data into Opensearch
         vector_store.insert_chunks(
-            emb_model=emb_model_dict['emb_model'],
-            emb_endpoint=emb_model_dict['emb_endpoint'],
-            max_tokens=emb_model_dict['max_tokens'],
-            chunks=combined_chunks
+            combined_chunks,
+            embedder=embedder
         )
         logger.info("Processed documents loaded into DB")
 
@@ -126,10 +127,10 @@ common_parser.add_argument("--debug", action="store_true", help="Enable debug lo
 parser = argparse.ArgumentParser(description="Data Ingestion CLI", formatter_class=argparse.RawTextHelpFormatter, parents=[common_parser])
 command_parser = parser.add_subparsers(dest="command", required=True)
 
-ingest_parser = command_parser.add_parser("ingest", help="Ingest the DOCs", description="Ingest the DOCs into Milvus after all the processing\n", formatter_class=argparse.RawTextHelpFormatter, parents=[common_parser])
+ingest_parser = command_parser.add_parser("ingest", help="Ingest the DOCs", description="Ingest the DOCs into OpenSearch after all the processing\n", formatter_class=argparse.RawTextHelpFormatter, parents=[common_parser])
 ingest_parser.add_argument("--path", type=str, default="/var/docs", help="Path to the documents that needs to be ingested into the RAG")
 
-command_parser.add_parser("clean-db", help="Clean the DB", description="Clean the Milvus DB\n", formatter_class=argparse.RawTextHelpFormatter, parents=[common_parser])
+command_parser.add_parser("clean-db", help="Clean the DB", description="Clean the OpenSearch DB\n", formatter_class=argparse.RawTextHelpFormatter, parents=[common_parser])
 
 # Setting log level, 1st priority is to the flag received via cli, 2nd priority to the LOG_LEVEL env var.
 log_level = logging.INFO
@@ -144,8 +145,8 @@ if command_args.debug:
 
 set_log_level(log_level)
 
-from common.db_utils import MilvusVectorStore
 from ingest.doc_utils import process_documents
+from common.vector_db import VectorStore
 
 logger = get_logger("Ingest")
 
