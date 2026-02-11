@@ -4,7 +4,8 @@ pipeline {
         // Secret text PAT (create separately in Jenkins credentials)
         GITHUB_TOKEN  = credentials('adarsh-pat')
         REPO_FULL  = 'adarshagrawal38/project-ai-services'
-        JENKINS_DEPLOY_JOB = 'deploy-ai-services'
+        http://10.20.178.84:8080/job/adarsh/job/PR-Preview-Pipeline/build
+        JENKINS_DEPLOY_JOB = 'PR-Preview-Pipeline'
     }
     
     stages {
@@ -64,7 +65,7 @@ pipeline {
                     def enc_branchName = java.net.URLEncoder.encode(env.BRANCH_NAME, 'UTF-8')
                     def commit = env.GIT_COMMIT
                     // VVVV def deployUrl = "${base}/job/${env.e}/buildWithParameters?PR=${env.CHANGE_ID}"
-                    def deployUrl = "${base}/job/${env.JENKINS_DEPLOY_JOB}/buildWithParameters?PR=${enc_branchName}&COMMIT=${commit}"
+                    def deployUrl = "${base}/job/adarsh/job/${env.JENKINS_DEPLOY_JOB}/buildWithParameters?PR=${enc_branchName}&COMMIT=${commit}"
                     echo "Target URL: ${deployUrl}"
                     sh """#!/usr/bin/env bash
                     // prevents errors in a pipeline from being masked. If any command in a pipeline fails, use that return code
