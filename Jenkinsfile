@@ -2,7 +2,7 @@ pipeline {
     agent { label 'ai-services-4-spyre-card-1' }
     environment {
         // Secret text PAT (create separately in Jenkins credentials)
-        GITHUB_TOKEN  = credentials('adarsh-jenkins-pat')
+        GITHUB_TOKEN  = credentials('adarsh-pat')
         REPO_FULL  = 'adarshagrawal38/project-ai-services'
         JENKINS_DEPLOY_JOB = 'deploy-ai-services'
     }
