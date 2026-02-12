@@ -6,6 +6,7 @@ import argparse
 
 from common.misc_utils import *
 
+
 def reset_db():
     vector_store = MilvusVectorStore()
     vector_store.reset_collection()
