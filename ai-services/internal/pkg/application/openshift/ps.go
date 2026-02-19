@@ -1,4 +1,4 @@
-package podman
+package openshift
 
 import (
 	"github.com/project-ai-services/ai-services/internal/pkg/application/types"
@@ -6,8 +6,8 @@ import (
 )
 
 // List returns information about running applications.
-func (p *PodmanApplication) List(opts types.ListOptions) ([]types.ApplicationInfo, error) {
-	logger.Warningln("yet to implement")
+func (o *OpenshiftApplication) List(opts types.ListOptions) ([]types.ApplicationInfo, error) {
+	logger.Warningln("not implemented")
 
 	return nil, nil
 }
