@@ -1,6 +1,6 @@
 pipeline {
     agent { label 'onprem-ai-services-4-spyre-cards' }
-    
+
     environment {
         PROJECT_NAME = 'project-ai-services'
         AI_SERVICES_DIR = 'ai-services'
@@ -32,7 +32,7 @@ pipeline {
         // If no selection is made, the deployment will proceed based on the code changes.
         choice(
             name: 'DEPLOY_APP',
-            choices: ['auto', 'rag-dev', 'summarization'],
+            choices: ['auto', 'rag-dev'],
             description: 'Select the application to deploy',
         )
     }
@@ -93,7 +93,7 @@ pipeline {
         stage('Build Images') {
             steps {
                 script {
-                    if (env.APP_NAME.contains(env.RAG_APP_NAME)) {
+                    if (env.DEPLOY_APP == env.RAG_APP_NAME) {
                         buildAppImage(env.RAG_APP_NAME)
                     } else {
                         println 'Skipping rebuilding images of the application.'
@@ -230,7 +230,7 @@ def getDeployedAppName() {
         def outputLines = apps.readLines()
         if (outputLines.size() > 2 ) {
             appName = outputLines[2].split()[0]
-            println "Application '${appName}' is deployed."
+            println "Application: '${appName}' is deployed."
         }
     }
     return appName
