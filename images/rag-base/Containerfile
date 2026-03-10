@@ -5,7 +5,7 @@ FROM registry.access.redhat.com/ubi9/ubi:9.7
 RUN yum install -y --setopt=tsflags=nodocs python3.12-devel python3.12-pip \
         lcms2-devel openblas-devel freetype libicu libjpeg-turbo && \
     yum install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm && \
-    yum install -y spatialindex-devel && \
+    yum install -y spatialindex-devel libtiff-devel && \
     yum clean all && rm -rf /var/cache/yum && \
     rm -rf /usr/bin/python && rm -rf /usr/bin/python3 && \
     ln -s /usr/bin/pip3.12 /usr/bin/pip && ln -s /usr/bin/pip3.12 /usr/bin/pip3 && \
