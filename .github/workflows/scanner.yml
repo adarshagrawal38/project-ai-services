@@ -14,6 +14,9 @@ on:
       image:
         required: false
         type: string
+      registry-image:
+        required: false
+        type: string
       ignore-unfixed:
         required: false
         type: boolean
@@ -58,18 +61,25 @@ jobs:
         run: |
           make build REGISTRY=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }} REGISTRY_USER=${{ secrets.ICR_USERNAME }} REGISTRY_PASSWORD=${{ secrets.ICR_APIKEY }}
 
-      - name: Pull latest image Tag
+      - name: Pull image from registry
         if: ${{ inputs.skip-image-build }}
-        working-directory: ${{ inputs.path }}
-        id: image-tag
+        working-directory: ${{ inputs.path || '.' }}
         run: |
-          TAG_VALUE=$(make image-tag)
-          IMAGE_NAME=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }}/${{ inputs.image }}:${TAG_VALUE}
+          if [ -n "${{ inputs.registry-image }}" ]; then
+            IMAGE_NAME="${{ inputs.registry-image }}"
+          else
+            TAG_VALUE=$(make image-tag)
+            IMAGE_NAME=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }}/${{ inputs.image }}:${TAG_VALUE}
+          fi
           podman pull --creds ${{ secrets.ICR_USERNAME }}:${{ secrets.ICR_APIKEY }} $IMAGE_NAME
 
       - name: Save image in file
         run: |
-          IMAGE_NAME=$(podman images --format "{{.Repository}}:{{.Tag}}" | grep "${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }}" | head -n 1)
+          if [ -n "${{ inputs.registry-image }}" ]; then
+            IMAGE_NAME="${{ inputs.registry-image }}"
+          else
+            IMAGE_NAME=$(podman images --format "{{.Repository}}:{{.Tag}}" | grep "${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }}" | head -n 1)
+          fi
           podman save > ${{ env.IMAGE_FILE_NAME }} $IMAGE_NAME
 
       - name: Trivy vulnerability scan

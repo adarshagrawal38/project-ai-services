@@ -1,6 +1,8 @@
 name: Scheduled CVE and Licenses Scan
 
 on:
+  # Added pull_request_target to validate PR commit, will remove it.
+  pull_request_target:
   schedule:
     - cron: '0 0 */2 * *'
 
@@ -25,8 +27,8 @@ jobs:
       image: 'rag-base'
       skip-image-build: true
       ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan || false }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan || false }}
+      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
+      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
     secrets:
       ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
       ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
@@ -38,8 +40,8 @@ jobs:
       image: 'rag'
       skip-image-build: true
       ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan || false }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan || false }}
+      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
+      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
     secrets:
       ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
       ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
@@ -51,8 +53,8 @@ jobs:
       image: 'rag-ui'
       skip-image-build: true
       ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan || false }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan || false }}
+      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
+      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
     secrets:
       ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
       ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
@@ -64,8 +66,32 @@ jobs:
       image: 'tools'
       skip-image-build: true
       ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan || false }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan || false }}
+      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
+      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
+    secrets:
+      ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
+      ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
+
+  vllm-ppc64le:
+    uses: ./.github/workflows/scanner.yml
+    with:
+      registry-image: 'icr.io/ppc64le-oss/vllm-ppc64le:latest'
+      image: 'vllm-ppc64le'
+      ignore-unfixed: false
+      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
+      skip-license-scan: true
+    secrets:
+      ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
+      ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
+
+  opensearch:
+    uses: ./.github/workflows/scanner.yml
+    with:
+      registry-image: 'icr.io/ai-services-private/opensearch:latest'
+      image: 'opensearch'
+      ignore-unfixed: false
+      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
+      skip-license-scan: true
     secrets:
       ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
       ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
