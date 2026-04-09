@@ -12,11 +12,13 @@ pipeline {
     environment { 
         CERT_DIR = "${WORKSPACE}/certs"
         PUBLIC_ARTIFACTS_DIR = "${WORKSPACE}/public-artifacts"
-        DOCKER_AGENT_PUBLIC_ARTIFACTS_DIR = "/home/jenkins/public-artifacts"
+        DOCKER_AGENT_PUBLIC_ARTIFACTS_DIR = '/home/jenkins/public-artifacts'
         PFX_CREDS = credentials('pfx-credentials')
-        REGISTRY = "docker-na.artifactory.swg-devops.com"
+        REGISTRY = 'docker-na.artifactory.swg-devops.com'
         AI_SERVICES_REPO_URL = 'https://github.com/IBM/project-ai-services.git'
         REPO_DIR = 'project-ai-services'
+        GARASIGN_CLIENT = '/opt/Garantir/bin/garasign'
+        HOME_DIR = '/home/jenkins'
     }
     
     stages {
@@ -28,7 +30,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Setup Certs') {
             steps {
                 script {
@@ -40,22 +42,21 @@ pipeline {
         stage('Code Signing Agent') {
             agent {
                 docker {
-                    label 'shared-x86-centos9' 
-                
+                    label 'shared-x86-centos9'
+
                     image "${env.REGISTRY}/taas-docker-public/jonk/agent-jnlp:latest"
                     registryCredentialsId 'jfrog'
                     registryUrl "https://${env.REGISTRY}"
                     args """
                     -e VERSION=${params.VERSION} \
-                    -e CODE_SIGNING_PFX_FILE=/home/jenkins/certs/cert.pfx \
+                    -e CODE_SIGNING_PFX_FILE=${env.HOME_DIR}/certs/cert.pfx \
                     -e CODE_SIGNING_P12_PASSWORD=${PFX_CREDS} \
-                    -v ${CERT_DIR}:/home/jenkins/certs:z \
+                    -v ${CERT_DIR}:${env.HOME_DIR}/certs:z \
                     -v ${PUBLIC_ARTIFACTS_DIR}:${DOCKER_AGENT_PUBLIC_ARTIFACTS_DIR}:z
                     """
-                    
                 }
             }
-            
+
             stages {
                 stage('Initialize Garasign Client') {
                     steps {
@@ -80,7 +81,7 @@ pipeline {
                         }
                     }
                 }
-                
+
                 stage('Build Binaries') {
                     steps {
                         script {
@@ -88,7 +89,7 @@ pipeline {
                         }
                     }
                 }
-                
+
                 stage('Sign and Verify Binaries') {
                     steps {
                         script {
@@ -123,24 +124,22 @@ pipeline {
     }
 }
 
-// Helper Functions
-
 def validateVersion() {
     if (!params.VERSION) {
         error('VERSION parameter is required')
     }
-    
+
     echo "Validating version: ${params.VERSION}"
-    
+
     def tags = sh(
         script: "git ls-remote --tags ${env.AI_SERVICES_REPO_URL} | cut -d/ -f3",
         returnStdout: true
     ).trim()
-    
+
     if (!tags.contains(params.VERSION)) {
         error "Failed to find tag ${params.VERSION} in repository"
     }
-    
+
     echo "Version ${params.VERSION} validated successfully"
 }
 
@@ -183,7 +182,7 @@ def initializeGaraClient() {
     
     sh """
         setup-garasign-client
-        cp /home/jenkins/.config/Garantir/GRS/config.ini /root/.config/Garantir/GRS/config.ini
+        cp ${env.HOME_DIR}/.config/Garantir/GRS/config.ini /root/.config/Garantir/GRS/config.ini
         GrsGPGLoader
         garasign listkeys
     """
@@ -192,22 +191,22 @@ def initializeGaraClient() {
 }
 
 def exportPublicCertificates() {
-    echo "Exporting public certificates..."
+    echo 'Exporting public certificates...'
     
     def keys = sh(
-        script: "/opt/Garantir/bin/garasign listkeys | grep -i PRD | awk 'NR==1{print \$8}'",
+        script: "$GARASIGN_CLIENT listkeys | grep -i PRD | awk 'NR==1{print \$8}'",
         returnStdout: true
     ).trim()
     
     if (!keys) {
-        error "Failed to retrieve Garasign key"
+        error 'Failed to retrieve Garasign key'
     }
     
     env.KEYS = keys
     echo "Using Garasign key: ${env.KEYS}"
     
     sh """
-        /opt/Garantir/bin/garasign export \
+        $GARASIGN_CLIENT export \
             --key \${KEYS} \
             --outputDirectory \${DOCKER_AGENT_PUBLIC_ARTIFACTS_DIR}
         
@@ -232,8 +231,6 @@ def checkoutRepository() {
         git checkout ${params.VERSION}
         ls -lrt
     """
-    
-    echo "Repository checked out successfully"
 }
 
 def buildBinaries() {
@@ -244,8 +241,6 @@ def buildBinaries() {
         make binaries
         ls -lrt bin
     """
-    
-    echo "Binaries built successfully"
 }
 
 def signAndVerifyBinaries() {
@@ -261,7 +256,7 @@ def signAndVerifyBinaries() {
             
             # Sign the binary
             echo "Signing $BINARY_NAME..."
-            /opt/Garantir/bin/garasign sign \
+            $GARASIGN_CLIENT sign \
                 --type cosign \
                 --additionalFlags --tlog-upload=false \
                 --key "$KEYS" \
@@ -282,11 +277,11 @@ def signAndVerifyBinaries() {
         done
     '''
     
-    echo "All binaries signed and verified successfully"
+    echo 'All binaries signed and verified successfully'
 }
 
 def uploadArtifacts() {
-    echo "Uploading signed artifacts..."
+    echo 'Uploading signed artifacts...'
     
     sh "ls -lrt ${env.PUBLIC_ARTIFACTS_DIR}"
     
@@ -301,8 +296,5 @@ def uploadArtifacts() {
 
 def cleanup() {
     echo "Cleaning up..."
-    
     sh "rm -rf ${env.CERT_DIR}"
-    
-    echo "Cleanup completed"
 }
