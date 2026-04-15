@@ -14,19 +14,28 @@ pipeline {
     }
     
     environment {
+        // Directory paths
         CERT_DIR = "/tmp/certs"
         PUBLIC_ARTIFACTS_DIR = "/tmp/public-artifacts"
         DOCKER_AGENT_PUBLIC_ARTIFACTS_DIR = '/home/jenkins/public-artifacts'
+        HOME_DIR = '/home/jenkins'
+        REPO_DIR = 'project-ai-services'
+        
+        // Credentials
         PFX_CREDS = credentials('pfx-credentials')
+        
+        // Registry configuration
         REGISTRY = 'docker-na.artifactory.swg-devops.com'
         AI_SERVICES_REPO_URL = 'https://github.com/IBM/project-ai-services.git'
-        REPO_DIR = 'project-ai-services'
+        
+        // Garasign configuration
         GARASIGN_CLIENT = '/opt/Garantir/bin/garasign'
-        HOME_DIR = '/home/jenkins'
+        GARASIGN_MODULE_PATH = '/usr/local/lib/Garantir/GRS/libgrsp11.so'
+        GARASIGN_SLOT_ID = '1'
     }
     
     stages {
-        stage('Validate Parameters') {
+        stage('Initialize') {
             steps {
                 script {
                     validateVersion()
@@ -34,6 +43,7 @@ pipeline {
                 }
             }
         }
+        
         stage('Checkout') {
             steps {
                 script {
@@ -42,116 +52,92 @@ pipeline {
             }
         }
 
-
-        stage('Rag') {
+        stage('Build RAG Backend') {
             steps {
                 script {
-                    def name = buildAndPublishImage('spyre-rag/src/', 'rag')
-                    echo "Successfully built and pushed: ${name}"
-                    env.ICR_RAG_IMAGE = name
+                    env.ICR_RAG_IMAGE = buildAndPublishImage('spyre-rag/src/', 'rag')
                 }
             }
         }
 
-        stage('Rag UI') {
+        stage('Build RAG UI') {
             steps {
                 script {
-                    def name = buildAndPublishImage('spyre-rag/ui/', 'rag-ui')
-                    echo "Successfully built and pushed: ${name}"
-                    env.ICR_RAG_UI_IMAGE = name
+                    env.ICR_RAG_UI_IMAGE = buildAndPublishImage('spyre-rag/ui/', 'rag-ui')
                 }
             }
         }
 
-        stage('Rag base') {
+        stage('Build RAG Base') {
             steps {
                 script {
-                    def name = buildAndPublishImage('images/rag-base/', 'rag-base')
-                    echo "Successfully built and pushed: ${name}"
-                    env.ICR_RAG_BASE_IMAGE = name
+                    env.ICR_RAG_BASE_IMAGE = buildAndPublishImage('images/rag-base/', 'rag-base')
                 }
             }
         }
 
-        
-
-        stage('Tools-amd64') {
+        stage('Build Tools AMD64') {
             agent { label 'shared-x86-centos9' }
             steps {
                 script {
                     sh 'rm -rf project-ai-services'
                     checkoutRepository()
-
-                    def name = buildAndPublishImage('images/tools/', 'tools')
-                    echo "Successfully built and pushed: ${name}"
-                    env.ICR_TOOL_IMAGE_AMD = name
+                    env.ICR_TOOL_IMAGE_AMD = buildAndPublishImage('images/tools/', 'tools')
                 }
             }
         }
 
-        stage('Tools-arm64') {
+        stage('Build Tools ARM64') {
             agent { label 'shared-x86-centos9' }
             steps {
                 script {
-                    def name = buildToolArmImage('images/tools/', 'tools')
-                    echo "Successfully built and pushed: ${name}"
-                    env.ICR_TOOL_IMAGE_ARM = name
+                    env.ICR_TOOL_IMAGE_ARM = buildToolArmImage('images/tools/', 'tools')
                 }
             }
         }
 
-        stage('Tools-ppc64le') {
+        stage('Build Tools PPC64LE') {
             steps {
                 script {
-                    def name = buildAndPublishImage('images/tools/', 'tools')
-                    echo "Successfully built and pushed: ${name}"
-                    env.ICR_TOOL_IMAGE_PPC64LE = name
+                    env.ICR_TOOL_IMAGE_PPC64LE = buildAndPublishImage('images/tools/', 'tools')
                 }
             }
         }
 
-        stage('Tools-manifest') {
+        stage('Create Tools Manifest') {
             agent { label 'shared-x86-centos9' }
             steps {
                 script {
-                    dir('project-ai-services/images/tools/'){
-                        withCredentials([usernamePassword(
-                            credentialsId: 'icr-credentials-personal',
-                            usernameVariable: 'ICR_USERNAME',
-                            passwordVariable: 'ICR_PASSWORD'
-                        )]) {
-
-                        sh """ make  manifest REGISTRY=${params.ICR_REGISTRY} REGISTRY_USER=$ICR_USERNAME REGISTRY_PASSWORD=$ICR_PASSWORD  """
-                        def tag = sh(script: "awk -F '=' '/TAG\\?/{print \$2}' Makefile", returnStdout: true).trim()
-                        def name = "${params.ICR_REGISTRY}/tools:${tag}"
-                        env.ICR_TOOL_IMAGE = name
-                        echo "Icr toold image name: ${name}"
-                        }
-                    }
+                    env.ICR_TOOL_IMAGE = createToolsManifest()
                 }
             }
         }
 
-        stage('Catalog UI') {
+        stage('Build AI Services') {
             steps {
                 script {
-                    def name = buildAndPublishImage('catalog-ui', 'catalog-ui')
-                    echo "Successfully built and pushed: ${name}"
-                    env.ICR_CATALOG_UI_IMAGE = name
-                }
-            }
-        }
-        stage('Digitize UI') {
-            steps {
-                script {
-                    def name = buildAndPublishImage('digitize-ui', 'digitize-ui')
-                    echo "Successfully built and pushed: ${name}"
-                    env.ICR_DIGITIZE_UI_IMAGE = name
+                    env.ICR_AI_SERVICES_IMAGE = buildAndPublishImage('ai-services', 'ai-services')
                 }
             }
         }
 
-        stage('Setup Certs') {
+        stage('Build Catalog UI') {
+            steps {
+                script {
+                    env.ICR_CATALOG_UI_IMAGE = buildAndPublishImage('catalog-ui', 'catalog-ui')
+                }
+            }
+        }
+
+        stage('Build Digitize UI') {
+            steps {
+                script {
+                    env.ICR_DIGITIZE_UI_IMAGE = buildAndPublishImage('digitize-ui', 'digitize-ui')
+                }
+            }
+        }
+
+        stage('Setup Certificates') {
             agent { label 'shared-x86-centos9' }
             steps {
                 script {
@@ -160,28 +146,19 @@ pipeline {
             }
         }
 
-        stage('List Images') {
+        stage('Generate Image List') {
             agent { label 'shared-x86-centos9' }
             steps {
                 script {
-                    // Write image tags to file
-                    sh """echo "${env.ICR_RAG_IMAGE}" > images.txt"""
-                    sh """echo "${env.ICR_RAG_UI_IMAGE}" >> images.txt"""
-                    sh """echo "${env.ICR_RAG_BASE_IMAGE}" >> images.txt"""
-                    sh """echo "${env.ICR_TOOL_IMAGE}" >> images.txt"""
-                    sh """echo "${env.ICR_CATALOG_UI_IMAGE}" >> images.txt"""
-                    sh """echo "${env.ICR_DIGITIZE_UI_IMAGE}" >> images.txt"""
-                    sh "cat images.txt"
-                    sh "mv images.txt ${CERT_DIR}/images.txt"
+                    generateImageList()
                 }
             }
         }
 
-        stage('Code Signing Agent') { 
+        stage('Code Signing Agent') {
             agent {
                 docker {
                     label 'shared-x86-centos9'
-
                     image "${env.REGISTRY}/taas-docker-public/jonk/agent-jnlp:latest"
                     registryCredentialsId 'jfrog'
                     registryUrl "https://${env.REGISTRY}"
@@ -196,7 +173,7 @@ pipeline {
             }
 
             stages {
-                stage('Initialize Garasign Client') {
+                stage('Initialize Garasign') {
                     steps {
                         script {
                             initializeGaraClient()
@@ -204,7 +181,7 @@ pipeline {
                     }
                 }
 
-                stage('Export Public Certificates') {
+                stage('Export Certificates') {
                     steps {
                         script {
                             exportPublicCertificates()
@@ -212,30 +189,12 @@ pipeline {
                     }
                 }
 
-                stage('Sign and Verify Images') {
+                stage('Sign Images') {
                     steps {
                         script {
                             cosignLogin()
+                            signImages()
                         }
-                        sh """
-set +x  # Disable command echoing for sensitive operations
-pkc_token=\$(cosign pkcs11-tool list-keys-uris --module-path /usr/local/lib/Garantir/GRS/libgrsp11.so --slot-id 1 2>/dev/null | grep pkcs11 | awk '{print \$2}')
-
-if [ -z "\$pkc_token" ]; then
-    echo "ERROR: Failed to retrieve PKCS11 token URI"
-    exit 1
-fi
-
-echo "PKCS11 token retrieved successfully"
-
-while read -r image
-do
-    echo "Signing image: \$image"
-    cosign sign --key \$pkc_token --tlog-upload=false -r --cert-chain $DOCKER_AGENT_PUBLIC_ARTIFACTS_DIR/\${KEYS}.pem.chain \$image
-done < $HOME_DIR/certs/images.txt
-
-echo "All images signed successfully"
-                        """
                     }
                 }
             }
@@ -258,10 +217,10 @@ echo "All images signed successfully"
             }
         }
         success {
-            echo "Code signing pipeline completed successfully for version ${params.VERSION}"
+            echo "✓ Image signing pipeline completed successfully for version ${params.VERSION}"
         }
         failure {
-            echo "Code signing pipeline failed for version ${params.VERSION}"
+            echo "✗ Image signing pipeline failed for version ${params.VERSION}"
         }
     }
 }
@@ -282,17 +241,142 @@ def validateVersion() {
         error "Failed to find tag ${params.VERSION} in repository"
     }
 
-    echo "Version ${params.VERSION} validated successfully"
+    echo "✓ Version ${params.VERSION} validated successfully"
+}
+
+
+def checkoutRepository() {
+    echo "Checking out repository at version ${params.VERSION}..."
+
+    sh """
+        rm -rf ${env.REPO_DIR}
+        git clone ${env.AI_SERVICES_REPO_URL}
+        cd ${env.REPO_DIR}
+        git checkout ${params.VERSION}
+        ls -lrt
+    """
+
+    echo "✓ Repository checked out successfully"
+}
+
+
+def buildAndPublishImage(String imagePath, String imageName) {
+    def icrImage = ''
+    dir("${REPO_DIR}/${imagePath}") {
+        echo "Building and pushing ${imageName} image..."
+
+        def tag = sh(script: "make image-tag", returnStdout: true).trim()
+        icrImage = "${params.ICR_REGISTRY}/${imageName}:${tag}"
+
+        withCredentials([usernamePassword(
+            credentialsId: 'icr-credentials-personal',
+            usernameVariable: 'ICR_USERNAME',
+            passwordVariable: 'ICR_PASSWORD'
+        )]) {
+            sh """
+                make build REGISTRY=${params.ICR_REGISTRY} \
+                    REGISTRY_USER=\$ICR_USERNAME \
+                    REGISTRY_PASSWORD=\$ICR_PASSWORD
+
+                make push REGISTRY=${params.ICR_REGISTRY} \
+                    REGISTRY_USER=\$ICR_USERNAME \
+                    REGISTRY_PASSWORD=\$ICR_PASSWORD
+            """
+        }
+        
+        echo "✓ Successfully built and pushed: ${icrImage}"
+    }
+    return icrImage
+}
+
+def buildToolArmImage(String imagePath, String imageName) {
+    def icrImage = ''
+    dir("${REPO_DIR}/${imagePath}") {
+        echo "Building ARM64 ${imageName} image..."
+
+        def toolVersion = sh(
+            script: "awk -F '=' '/TAG\\?/{print \$2}' Makefile",
+            returnStdout: true
+        ).trim()
+        def tag = "${toolVersion}-arm64"
+        icrImage = "${params.ICR_REGISTRY}/${imageName}:${tag}"
+
+        withCredentials([usernamePassword(
+            credentialsId: 'icr-credentials-personal',
+            usernameVariable: 'ICR_USERNAME',
+            passwordVariable: 'ICR_PASSWORD'
+        )]) {
+            // Setup buildx for multi-arch builds
+            sh """
+                docker run --privileged --rm docker.io/tonistiigi/binfmt --install all
+                docker buildx rm multiarch || true
+                docker buildx create --name multiarch --driver docker-container --use
+                docker buildx inspect --bootstrap
+            """
+            
+            // Create Docker config for authentication
+            sh '''
+                AUTH=\$(printf "%s" "\$ICR_USERNAME:\$ICR_PASSWORD" | base64)
+                cat > ${WORKSPACE}/config.json <<EOF
+{"auths":{"icr.io":{"auth":"\$AUTH"}}}
+EOF
+            '''
+            
+            // Build and push ARM64 image
+            sh """
+                DOCKER_CONFIG=${WORKSPACE} docker buildx build \
+                    --platform linux/arm64 \
+                    --rm \
+                    -t ${params.ICR_REGISTRY}/${imageName}:${tag} \
+                    --provenance=false \
+                    -f Containerfile \
+                    . \
+                    --push
+            """
+        }
+        
+        echo "✓ Successfully built and pushed ARM64: ${icrImage}"
+    }
+    return icrImage
+}
+
+def createToolsManifest() {
+    def manifestImage = ''
+    dir("${REPO_DIR}/images/tools/") {
+        echo "Creating multi-arch manifest for tools image..."
+
+        withCredentials([usernamePassword(
+            credentialsId: 'icr-credentials-personal',
+            usernameVariable: 'ICR_USERNAME',
+            passwordVariable: 'ICR_PASSWORD'
+        )]) {
+            sh """
+                make manifest \
+                    REGISTRY=${params.ICR_REGISTRY} \
+                    REGISTRY_USER=\$ICR_USERNAME \
+                    REGISTRY_PASSWORD=\$ICR_PASSWORD
+            """
+
+            def tag = sh(
+                script: "awk -F '=' '/TAG\\?/{print \$2}' Makefile",
+                returnStdout: true
+            ).trim()
+            manifestImage = "${params.ICR_REGISTRY}/tools:${tag}"
+
+            echo "✓ Created manifest: ${manifestImage}"
+        }
+    }
+    return manifestImage
 }
 
 def setupCerts() {
     echo "Setting up certificate directory..."
-    
+
     sh """
         mkdir -p ${env.CERT_DIR}
         mkdir -p ${env.PUBLIC_ARTIFACTS_DIR}
     """
-    
+
     withCredentials([
         file(credentialsId: 'garasign-pfx-cert', variable: 'PFX_CERT')
     ]) {
@@ -301,180 +385,150 @@ def setupCerts() {
             chmod 600 ${env.CERT_DIR}/cert.pfx
         """
     }
-    
-    echo "Credentials prepared successfully"
+
+    echo "✓ Certificates prepared successfully"
 }
 
-def loginToRegistry() {
-    echo "Logging in to ${env.REGISTRY}..."
-    
-    withCredentials([usernamePassword(
-        credentialsId: 'jfrog',
-        usernameVariable: 'USERNAME',
-        passwordVariable: 'PASSWORD'
-    )]) {
-        sh 'echo ${PASSWORD} | docker login ${REGISTRY} -u ${USERNAME} --password-stdin'
+def generateImageList() {
+    echo "Generating image list for signing..."
+
+    def images = [
+        env.ICR_RAG_IMAGE,
+        env.ICR_RAG_UI_IMAGE,
+        env.ICR_RAG_BASE_IMAGE,
+        env.ICR_TOOL_IMAGE,
+        env.ICR_AI_SERVICES_IMAGE,
+        env.ICR_CATALOG_UI_IMAGE,
+        env.ICR_DIGITIZE_UI_IMAGE
+    ]
+
+    def imageList = images.join('\n')
+
+
+    dir("${CERT_DIR}") {
+        writeFile file: 'images.txt', text: imageList
+        sh 'cat images.txt'
     }
-    
-    echo "Registry login successful"
+
+    echo "✓ Image list generated with ${images.size()} images"
 }
 
 def cosignLogin() {
+    echo 'Logging into ICR for Cosign...'
+    
     withCredentials([usernamePassword(
         credentialsId: 'icr-iam-creds',
         usernameVariable: 'ICR_USERNAME',
         passwordVariable: 'ICR_PASSWORD'
     )]) {
-        sh 'cosign login icr.io -u $ICR_USERNAME -p $ICR_PASSWORD'
+        sh 'cosign login icr.io -u \$ICR_USERNAME -p \$ICR_PASSWORD'
     }
+
+    echo '✓ Cosign login successful'
 }
 
 def initializeGaraClient() {
-    echo "Initializing Garasign client..."
-    
+    echo 'Initializing Garasign client...'
+
     sh """
         setup-garasign-client
         cp ${env.HOME_DIR}/.config/Garantir/GRS/config.ini /root/.config/Garantir/GRS/config.ini
         GrsGPGLoader
         garasign listkeys
     """
-    
-    echo "Garasign initialized successfully"
+
+    echo '✓ Garasign initialized successfully'
 }
 
 def exportPublicCertificates() {
     echo 'Exporting public certificates...'
-    
+
     def keys = sh(
-        script: "$GARASIGN_CLIENT listkeys | grep -i PRD | awk 'NR==1{print \$8}'",
+        script: "\$GARASIGN_CLIENT listkeys | grep -i PRD | awk 'NR==1{print \$8}'",
         returnStdout: true
     ).trim()
-    
+
     if (!keys) {
         error 'Failed to retrieve Garasign key'
     }
-    
+
     env.KEYS = keys
     echo "Using Garasign key: ${env.KEYS}"
-    
+
     sh """
-        $GARASIGN_CLIENT export \
+        \$GARASIGN_CLIENT export \
             --key \${KEYS} \
             --outputDirectory \${DOCKER_AGENT_PUBLIC_ARTIFACTS_DIR}
-        
+
         mv \${DOCKER_AGENT_PUBLIC_ARTIFACTS_DIR}/\${KEYS}.pem.pub.key \
            \${DOCKER_AGENT_PUBLIC_ARTIFACTS_DIR}/cosign.pub
-        
-        
+
         ls -lrt \${DOCKER_AGENT_PUBLIC_ARTIFACTS_DIR}
     """
-    
-    echo "Public certificates exported successfully"
+
+    echo '✓ Public certificates exported successfully'
 }
 
-def checkoutRepository() {
-    echo "Checking out repository at version ${params.VERSION}..."
-    
-    sh """
-        rm -rf ${env.REPO_DIR}
-        git clone ${env.AI_SERVICES_REPO_URL}
-        cd ${env.REPO_DIR}
-        git checkout ${params.VERSION}
-        ls -lrt
-    """
-}
-
-def buildBinaries() {
-    echo "Building binaries..."
+def signImages() {
+    echo "Signing images with Cosign..."
     
     sh """
-        cd ${env.REPO_DIR}/ai-services
-        make binaries
-        ls -lrt bin
+        set +x  # Disable command echoing for sensitive operations
+        
+        # Retrieve PKCS11 token
+        pkc_token=\$(cosign pkcs11-tool list-keys-uris \
+            --module-path ${env.GARASIGN_MODULE_PATH} \
+            --slot-id ${env.GARASIGN_SLOT_ID} 2>/dev/null | \
+            grep pkcs11 | awk '{print \$2}')
+        
+        if [ -z "\$pkc_token" ]; then
+            echo "ERROR: Failed to retrieve PKCS11 token URI"
+            exit 1
+        fi
+        
+        echo "✓ PKCS11 token retrieved successfully"
+        
+        # Sign each image
+        while IFS= read -r image; do
+            if [ -n "\$image" ]; then
+                echo "Signing image: \$image"
+                cosign sign \
+                    --key \$pkc_token \
+                    --tlog-upload=false \
+                    -r \
+                    --cert-chain ${DOCKER_AGENT_PUBLIC_ARTIFACTS_DIR}/\${KEYS}.pem.chain \
+                    \$image
+            fi
+        done < ${HOME_DIR}/certs/images.txt
+        
+        echo "✓ All images signed successfully"
     """
 }
-
 
 def uploadArtifacts() {
     echo 'Uploading signed artifacts...'
-    
-    sh "ls -lrt ${env.PUBLIC_ARTIFACTS_DIR}"
-    sh "pwd"
-    // sh "cp -r $PUBLIC_ARTIFACTS_DIR ${WORKSPACE}/public-artifacts/"
 
-    // sh "ls -lrt ${WORKSPACE}/public-artifacts/"
+    sh "ls -lrt ${env.PUBLIC_ARTIFACTS_DIR}"
+
     dir("${PUBLIC_ARTIFACTS_DIR}") {
         sh "rm -rf PRD*"
         archiveArtifacts(
-        artifacts: '**/*',
-        fingerprint: true,
-        allowEmptyArchive: false
+            artifacts: '**/*',
+            fingerprint: true,
+            allowEmptyArchive: false
         )
     }
-    echo "Artifacts uploaded successfully"
+
+    echo '✓ Artifacts uploaded successfully'
 }
 
 def cleanup() {
-    echo "Cleaning up..."
-    sh "rm -rf ${env.CERT_DIR}"
-    sh "rm -rf ${env.PUBLIC_ARTIFACTS_DIR}"
+    echo "Cleaning up temporary directories..."
+
+    sh """
+        rm -rf ${env.CERT_DIR} || true
+        rm -rf ${env.PUBLIC_ARTIFACTS_DIR} || true
+    """
+
+    echo '✓ Cleanup completed'
 }
-
-def buildToolArmImage(String imagePath, String image) {
-    def icrImage = ''
-    dir("${REPO_DIR}/${imagePath}") {
-        echo "Build and push ${image} image"
-        def tool_version = sh(script: "awk -F '=' '/TAG\\?/{print \$2}' Makefile", returnStdout: true).trim()
-        def tag = "${tool_version}-arm64"
-    
-        icrImage = "${params.ICR_REGISTRY}/${image}:${tag}"
-        env.ICR_REGISTRY = "${params.ICR_REGISTRY}"
-        withCredentials([usernamePassword(
-            credentialsId: 'icr-credentials-personal',
-            usernameVariable: 'ICR_USERNAME',
-            passwordVariable: 'ICR_PASSWORD'
-        )]) {
-            echo "Building image with tag: ${tag}"
-            sh "docker run --privileged --rm docker.io/tonistiigi/binfmt --install all"
-            sh """ 
-docker buildx rm multiarch || true
-docker buildx create --name multiarch --driver docker-container --use
-docker buildx inspect --bootstrap
-            """
-            sh "ls /proc/sys/fs/binfmt_misc/"
-
-
-            sh '''
-            AUTH=$(printf "%s" "$ICR_USERNAME:$ICR_PASSWORD" | base64)
-            cat > ${WORKSPACE}/config.json <<EOF
-{"auths":{"icr.io":{"auth":"$AUTH"}}}
-EOF
-            '''
-            
-            sh "DOCKER_CONFIG=${WORKSPACE} docker buildx build --platform linux/arm64 --rm  -t $ICR_REGISTRY/${image}:${tag} --provenance=false -f Containerfile . --push"
-        }
-    }
-    return icrImage
-}
-
-def buildAndPublishImage(String imagePath, String image) {
-    def icrImage = ''
-    dir("${REPO_DIR}/${imagePath}") {
-        echo "Build and push ${image} image"
-        def tag = sh(script: "make image-tag", returnStdout: true).trim()
-        icrImage = "${params.ICR_REGISTRY}/${image}:${tag}"
-        env.ICR_REGISTRY = "${params.ICR_REGISTRY}"
-        withCredentials([usernamePassword(
-            credentialsId: 'icr-credentials-personal',
-            usernameVariable: 'ICR_USERNAME',
-            passwordVariable: 'ICR_PASSWORD'
-        )]) {
-            echo "Building image with tag: ${tag}"
-            sh 'make build REGISTRY=$ICR_REGISTRY REGISTRY_USER=$ICR_USERNAME REGISTRY_PASSWORD=$ICR_PASSWORD'
-            echo "Pushing image: ${icrImage}"
-            sh 'make push REGISTRY=$ICR_REGISTRY REGISTRY_USER=$ICR_USERNAME REGISTRY_PASSWORD=$ICR_PASSWORD'
-        }
-    }
-    return icrImage
-}
-
