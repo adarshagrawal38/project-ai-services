@@ -1,0 +1,44 @@
+@use "@carbon/react/scss/spacing";
+
+.noDataContent {
+  padding: spacing.$spacing-07;
+}
+
+.tableContent {
+  padding: spacing.$spacing-07;
+}
+
+.tableColumn {
+  margin: 0;
+}
+
+.deleteConfirmation {
+  margin-top: spacing.$spacing-07;
+  font-weight: bolder;
+}
+
+.customToast {
+  position: fixed;
+  top: spacing.$spacing-10;
+  right: spacing.$spacing-07;
+  z-index: 9000;
+}
+
+.exportStatus {
+  display: flex;
+  align-items: center;
+  gap: spacing.$spacing-02;
+}
+
+.deployButtonWrapper {
+  :global(.cds--menu-button__trigger) {
+    width: spacing.$spacing-13;
+    min-width: spacing.$spacing-13;
+    max-width: spacing.$spacing-13;
+  }
+
+  :global(.cds--menu) {
+    width: auto;
+    min-width: spacing.$spacing-13;
+  }
+}
