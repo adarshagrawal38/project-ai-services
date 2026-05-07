@@ -7,7 +7,7 @@ RUN set -eux; \
     wget -O /etc/caddy/Caddyfile "https://github.com/caddyserver/dist/raw/509c30cecd3cbc4012f6b1cc88d8f3f000fb06e4/config/Caddyfile"; \
     wget -O /usr/share/caddy/index.html "https://github.com/caddyserver/dist/raw/509c30cecd3cbc4012f6b1cc88d8f3f000fb06e4/welcome/index.html"
 
-ENV CADDY_VERSION=v2.8.4
+ENV CADDY_VERSION=v2.11.2
 
 RUN set -eux; \
     arch="$(uname -m)"; \
