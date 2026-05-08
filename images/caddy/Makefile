@@ -8,7 +8,7 @@ IMAGE_TAG := $(REGISTRY)/$(IMAGE):$(TAG)
 
 CONTAINER_BUILDER?=podman
 build:
-	$(CONTAINER_BUILDER) build -t $(IMAGE_TAG) .
+	$(CONTAINER_BUILDER) build --build-arg CADDY_VERSION=$(TAG) -t $(IMAGE_TAG) .
 .PHONY: build
 
 push:

@@ -2,12 +2,12 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal:9.7
 
 RUN microdnf install -y ca-certificates libcap wget tar gzip && microdnf clean all
 
+ARG CADDY_VERSION=v2.11.2
+
 RUN set -eux; \
     mkdir -p /config/caddy /data/caddy /etc/caddy /usr/share/caddy ; \
-    wget -O /etc/caddy/Caddyfile "https://github.com/caddyserver/dist/raw/509c30cecd3cbc4012f6b1cc88d8f3f000fb06e4/config/Caddyfile"; \
-    wget -O /usr/share/caddy/index.html "https://github.com/caddyserver/dist/raw/509c30cecd3cbc4012f6b1cc88d8f3f000fb06e4/welcome/index.html"
-
-ENV CADDY_VERSION=v2.11.2
+    wget -O /etc/caddy/Caddyfile "https://github.com/caddyserver/dist/raw/${CADDY_VERSION}/config/Caddyfile"; \
+    wget -O /usr/share/caddy/index.html "https://github.com/caddyserver/dist/raw/${CADDY_VERSION}/welcome/index.html"
 
 RUN set -eux; \
     arch="$(uname -m)"; \
@@ -52,4 +52,3 @@ EXPOSE 2019/tcp
 WORKDIR /srv
 
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
-
