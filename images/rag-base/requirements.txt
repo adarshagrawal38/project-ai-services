@@ -49,7 +49,7 @@ jsonref==1.1.0
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 latex2mathml==3.81.0
-#lingua-language-detector==1.4.2
+lingua-language-detector==2.2.0
 lxml==6.1.0
 markdown-it-py==4.2.0
 marko==2.2.2
@@ -132,7 +132,7 @@ types-requests==2.33.0.20260408
 typing_extensions==4.15.0
 typing-inspection==0.4.2
 tzdata==2025.3
-ujson==5.12.0
+ujson==5.12.1
 urllib3==2.7.0
 uvicorn==0.44.0
 uvloop==0.22.1
