@@ -6,7 +6,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
-from common.lang_utils import get_prompt_for_language
+from common.lang_utils import get_prompt_for_language, lang_en, lang_de
 from common.misc_utils import get_logger, resolve_model_max_len
 from common.settings import settings
 from common.retry_utils import retry_on_transient_error
@@ -278,8 +278,10 @@ def query_vllm_payload(
         # Get the appropriate prompt template based on language and format it
         prompt_template = get_prompt_for_language(
             lang,
-            chatbot_settings.chatbot.query_vllm_stream_prompt,
-            chatbot_settings.chatbot.query_vllm_stream_de_prompt
+            {
+                lang_en: chatbot_settings.chatbot.query_vllm_stream_prompt,
+                lang_de: chatbot_settings.chatbot.query_vllm_stream_de_prompt,
+            }
         )
         prompt = prompt_template.format(context=context, question=question)
         
