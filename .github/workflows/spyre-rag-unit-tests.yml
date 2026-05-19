@@ -21,6 +21,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Install base dependencies
+        run: |
+          pip install -r images/python-base/requirements.txt \
+          --extra-index-url https://wheels.developerfirst.ibm.com/ppc64le/linux \
+          --prefer-binary
       
       - name: Install digitize test dependencies
         run: |
