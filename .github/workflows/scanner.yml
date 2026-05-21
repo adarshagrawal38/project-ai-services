@@ -46,7 +46,7 @@ env:
 
 jobs:
   cves:
-    runs-on: ubuntu-24.04-ppc64le
+    runs-on: ubuntu-latest
     if: ${{ !inputs['skip-cves-scan'] }}
     steps:
       - name: Checkout code
@@ -84,7 +84,7 @@ jobs:
 
 
   license:
-    runs-on: ubuntu-24.04-ppc64le
+    runs-on: ubuntu-latest
     if: ${{ !inputs['skip-license-scan'] }}
     steps:
       - name: Checkout code
