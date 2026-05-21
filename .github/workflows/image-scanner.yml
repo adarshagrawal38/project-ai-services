@@ -3,6 +3,7 @@ name: Scheduled CVE and Licenses Scan
 on:
   schedule:
     - cron: '0 0 */2 * *'
+  pull_request:
   workflow_dispatch:
     inputs:
       skip-cves-scan:
