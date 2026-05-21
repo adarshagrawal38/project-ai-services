@@ -3,7 +3,6 @@ name: Scheduled CVE and Licenses Scan
 on:
   schedule:
     - cron: '0 0 */2 * *'
-
   workflow_dispatch:
     inputs:
       skip-cves-scan:
@@ -18,181 +17,43 @@ on:
         default: false
 
 jobs:
-  caddy:
+  scan:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+         - path: images/caddy
+           image: caddy
+         - path: images/litellm
+           image: litellm
+         - path: images/postgres
+           image: postgres
+         - path: images/python-base
+           image: python-base
+         - path: images/tools
+           image: tools
+         - path: ui/catalog
+           image: catalog-ui
+         - path: ui/chatbot
+           image: chatbot-ui
+         - path: ui/digitize
+           image: digitize-ui
+         - path: services/chatbot
+           image: chatbot-service
+         - path: services/common
+           image: services-common
+         - path: services/digitize
+           image: digitize-service
+         - path: services/similarity
+           image: similarity-service
+         - path: services/summarize
+           image: summarize-service
+         - path: ai-services
+           image: ai-services
     uses: ./.github/workflows/scanner.yml
     with:
-      path: 'images/caddy'
-      image: 'caddy'
-      skip-image-build: true
-      ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
-    secrets:
-      ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
-      ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
-  
-  litellm:
-    uses: ./.github/workflows/scanner.yml
-    with:
-      path: 'images/litellm'
-      image: 'litellm'
-      skip-image-build: true
-      ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
-    secrets:
-      ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
-      ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
-  
-  postgres:
-    uses: ./.github/workflows/scanner.yml
-    with:
-      path: 'images/postgres'
-      image: 'postgres'
-      skip-image-build: true
-      ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
-    secrets:
-      ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
-      ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
-  
-  python-base:
-    uses: ./.github/workflows/scanner.yml
-    with:
-      path: 'images/python-base'
-      image: 'python-base'
-      skip-image-build: true
-      ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
-    secrets:
-      ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
-      ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
-  
-  tools:
-    uses: ./.github/workflows/scanner.yml
-    with:
-      path: 'images/tools'
-      image: 'tools'
-      skip-image-build: true
-      ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
-    secrets:
-      ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
-      ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
-
-  catalog-ui:
-    uses: ./.github/workflows/scanner.yml
-    with:
-      path: 'ui/catalog'
-      image: 'catalog-ui'
-      skip-image-build: true
-      ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
-    secrets:
-      ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
-      ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
-
-  chatbot-ui:
-    uses: ./.github/workflows/scanner.yml
-    with:
-      path: 'ui/chatbot'
-      image: 'chatbot-ui'
-      skip-image-build: true
-      ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
-    secrets:
-      ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
-      ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
-
-  digitize-ui:
-    uses: ./.github/workflows/scanner.yml
-    with:
-      path: 'ui/digitize'
-      image: 'digitize-ui'
-      skip-image-build: true
-      ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
-    secrets:
-      ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
-      ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
-  
-  # Services
-  chatbot-service:
-    uses: ./.github/workflows/scanner.yml
-    with:
-      path: 'services/chatbot'
-      image: 'chatbot-service'
-      skip-image-build: true
-      ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
-    secrets:
-      ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
-      ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
-  
-  services-common:
-    uses: ./.github/workflows/scanner.yml
-    with:
-      path: 'services/common'
-      image: 'services-common'
-      skip-image-build: true
-      ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
-    secrets:
-      ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
-      ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
-
-  digitize-service:
-    uses: ./.github/workflows/scanner.yml
-    with:
-      path: 'services/digitize'
-      image: 'digitize-service'
-      skip-image-build: true
-      ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
-    secrets:
-      ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
-      ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
-  
-  similarity-service:
-    uses: ./.github/workflows/scanner.yml
-    with:
-      path: 'services/similarity'
-      image: 'similarity-service'
-      skip-image-build: true
-      ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
-    secrets:
-      ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
-      ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
-  
-  summarize-service:
-    uses: ./.github/workflows/scanner.yml
-    with:
-      path: 'services/summarize'
-      image: 'summarize-service'
-      skip-image-build: true
-      ignore-unfixed: false
-      skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
-      skip-license-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-license-scan }}
-    secrets:
-      ICR_USERNAME: ${{ secrets.ICR_USERNAME }}
-      ICR_APIKEY: ${{ secrets.ICR_APIKEY }}
-  
-  ai-services:
-    uses: ./.github/workflows/scanner.yml
-    with:
-      path: 'ai-services'
-      image: 'ai-services'
+      path: ${{ matrix.path }}
+      image: ${{ matrix.image }}
       skip-image-build: true
       ignore-unfixed: false
       skip-cves-scan: ${{ github.event_name == 'workflow_dispatch' && inputs.skip-cves-scan }}
