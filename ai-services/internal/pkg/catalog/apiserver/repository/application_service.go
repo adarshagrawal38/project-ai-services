@@ -238,6 +238,7 @@ func (s *ApplicationService) GetApplicationByID(ctx context.Context, id uuid.UUI
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrApplicationNotFound
 		}
+
 		return nil, fmt.Errorf("failed to get application: %w", err)
 	}
 	// Build complete response with services and components

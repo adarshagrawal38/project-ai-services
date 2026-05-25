@@ -71,21 +71,6 @@ func CreateRouter(authSvc auth.Service, tokenMgr *auth.TokenManager, blacklist r
 	return router
 }
 
-// GetApplication godoc
-//
-//	@Summary		Get application details
-//	@Description	Get detailed information about a specific application
-//	@Tags			Applications
-//	@Produce		json
-//	@Security		BearerAuth
-//	@Param			id	path		string					true	"Application ID"
-//	@Success		200	{object}	map[string]interface{}	"Application details"
-//	@Failure		404	{object}	map[string]interface{}	"Application not found"
-//	@Router			/applications/{id} [get]
-func getApplication(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "This is a placeholder endpoint for " + c.FullPath()})
-}
-
 // DeleteApplication godoc
 //
 //	@Summary		Delete application
