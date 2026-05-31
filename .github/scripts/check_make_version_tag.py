@@ -49,29 +49,23 @@ def get_changed_files(base_ref: str) -> List[str]:
         sys.exit(1)
 
 
-def get_makefile_tag(makefile_path: Path, ref: Optional[str] = None, repo_root: Optional[Path] = None) -> Optional[str]:
+def get_makefile_tag(makefile_path: Path, ref: Optional[str] = None, componentPath: Optional[str] = None) -> Optional[str]:
     """
     Extract TAG value from a Makefile.
 
     Args:
         makefile_path: Path to the Makefile
         ref: Git ref to read from (e.g., 'origin/main'). If None, reads from working tree.
-        repo_root: Repository root path (needed for git operations)
+        componentPath: Repository root path (needed for git operations)
 
     Returns:
         TAG value or None if not found
     """
     try:
         if ref:
-            # Convert to relative path for git
-            if repo_root:
-                relative_path = makefile_path.relative_to(repo_root)
-            else:
-                relative_path = makefile_path
-            
             # Read from git ref
             result = subprocess.run(
-                ["git", "show", f"{ref}:{relative_path}"],
+                ["git", "show", f"{ref}:./{componentPath}/Makefile"],
                 capture_output=True,
                 text=True,
                 check=True,
@@ -126,7 +120,7 @@ def check_component_version_bump(
         return True, f"❌ Makefile not found: {component_path}/Makefile"
 
     # Get TAG from base branch
-    base_tag = get_makefile_tag(makefile_path, f"origin/{base_ref}")
+    base_tag = get_makefile_tag(makefile_path, f"origin/{base_ref}", component_path)
 
     # Get TAG from current branch
     head_tag = get_makefile_tag(makefile_path)
@@ -170,6 +164,7 @@ def main() -> int:
     base_ref = sys.argv[1] if len(sys.argv) > 1 else "main"
 
     repo_root = Path(__file__).parent.parent.parent
+    print("repo_root: {repo_root}")
 
     print("=" * 70)
     print("Checking Makefile version bumps for changed components...")
@@ -183,8 +178,6 @@ def main() -> int:
     if not changed_files:
         print("ℹ️  No files changed")
         return 0
-
-    print(f"Changed files: {len(changed_files)}")
     print()
 
     errors = []
