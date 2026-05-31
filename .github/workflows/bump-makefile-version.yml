@@ -34,6 +34,6 @@ jobs:
 
       - name: Check version bumps for all components
         run: |
-          python3 .github/scripts/check_make_version_tag.py ${{ github.base_ref }}
+          python3 .github/scripts/check_makefile_version_bump.py ${{ github.base_ref }}
 
 # Made with Bob
