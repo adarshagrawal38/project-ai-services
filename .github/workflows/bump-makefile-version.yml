@@ -2,45 +2,83 @@ name: Check Makefile Version Bump
 
 on:
   pull_request:
-    paths:
-      - 'spyre-rag/src/**'
-      - 'spyre-rag/ui/**'
-      - 'images/rag-base/**'
-      - 'digitize-ui/**'
+    paths: 
+      - 'services/chatbot/**'
+      - 'services/digitize/**'
+      - 'services/similarity/**'
+      - 'services/summarize/**'
+      - 'images/**'
+      - 'ui/**'
+      - 'ai-services/**'
+      - '.github/workflows/bump-makefile-version.yml'
     branches:
       - main
 
 jobs:
-  check-spyre-rag-src:
-    name: Check spyre-rag/src
-    uses: ./.github/workflows/bump-makefile-version-component.yml
-    with:
-      component_path: 'spyre-rag/src'
-      values_yaml_key: 'backend'
+  check-version-bump:
+    strategy:
+      matrix:
+        include:
+          # Services Images
+          - component_path: 'services/chatbot'
+            values_yaml_key: 'backend'
+            name: 'chatbot-service'
+          - component_path: 'services/digitize'
+            values_yaml_key: 'digitize'
+            name: 'digitize-service'
+          - component_path: 'services/similarity'
+            values_yaml_key: 'similarity'
+            name: 'similarity-service'
+          - component_path: 'services/summarize'
+            values_yaml_key: 'summarize'
+            name: 'summarize-service'
+          
+          # Images
+          - component_path: 'images/service-base'
+            values_yaml_key: ''
+            name: 'service-base'
+            additional_notes: |
+              Note: This is the base image used by spyre-rag containers.
+              After bumping, you may also need to update references in:
+              - services/*/Makefile (BASE_IMAGE)
+              - Any other dependent Makefiles or Containerfiles
+          - component_path: 'images/postgres'
+            values_yaml_key: 'postgres'
+            name: 'postgres'
+          - component_path: 'images/caddy'
+            values_yaml_key: 'caddy'
+            name: 'caddy'
+          - component_path: 'images/litellm'
+            values_yaml_key: 'litellm'
+            name: 'litellm'
 
-  check-spyre-rag-ui:
-    name: Check spyre-rag/ui
-    uses: ./.github/workflows/bump-makefile-version-component.yml
-    with:
-      component_path: 'spyre-rag/ui'
-      values_yaml_key: 'ui'
+          # UI Images
+          - component_path: 'ui/chatbot'
+            values_yaml_key: 'ui'
+            name: 'chatbot-ui'
+          - component_path: 'ui/digitize'
+            values_yaml_key: 'digitizeUi'
+            name: 'digitize-ui'
+          
+          # Catalog
+          - component_path: 'ui/catalog'
+            values_yaml_key: 'ui'
+            name: 'catalog-ui'
+          - component_path: 'ai-services'
+            values_yaml_key: 'backend'
+            name: 'ai-services'
+          - component_path: 'images/postgres'
+            values_yaml_key: 'db'
+            name: 'postgres'
+          - component_path: 'images/caddy'
+            values_yaml_key: 'caddy'
+            name: 'caddy'
 
-  check-rag-base:
-    name: Check images/rag-base
+    name: Check ${{ matrix.name }}
     uses: ./.github/workflows/bump-makefile-version-component.yml
     with:
-      component_path: 'images/rag-base'
-      additional_notes: |
-        Note: This is the base image used by spyre-rag containers.
-        After bumping, you may also need to update references in:
-        - spyre-rag/src/Makefile (BASE_IMAGE)
-        - Any other dependent Makefiles or Containerfiles
-
-  check-digitize-ui:
-    name: Check digitize-ui
-    uses: ./.github/workflows/bump-makefile-version-component.yml
-    with:
-      component_path: 'digitize-ui'
-      values_yaml_key: 'digitizeUi'
+      component_path: ${{ matrix.component_path }}
+      values_yaml_key: ${{ matrix.values_yaml_key }}
+      additional_notes: ${{ matrix.additional_notes || '' }}
 
 # Made with Bob

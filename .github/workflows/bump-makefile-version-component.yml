@@ -6,7 +6,7 @@ on:
       component_path:
         required: true
         type: string
-        description: 'Component path to watch for changes (e.g., "spyre-rag/src")'
+        description: 'Component path to watch for changes (e.g., "services/*")'
       values_yaml_key:
         required: false
         type: string
