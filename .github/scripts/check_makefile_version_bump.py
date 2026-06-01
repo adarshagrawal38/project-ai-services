@@ -25,11 +25,12 @@ COMPONENTS = [
     ("images/postgres", "postgres"),
     ("images/caddy", "caddy"),
     ("images/litellm", "litellm"),
+    ("images/tools", "tools"),
     # UI Images
     ("ui/chatbot", "chatbot-ui"),
     ("ui/digitize", "digitize-ui"),
-    # Catalog
     ("ui/catalog", "catalog-ui"),
+    # Ai Services
     ("ai-services", "ai-services"),
 ]
 
@@ -51,12 +52,12 @@ def get_changed_files(base_ref: str) -> List[str]:
 
 def get_makefile_tag(makefile_path: Path, ref: Optional[str] = None, componentPath: Optional[str] = None) -> Optional[str]:
     """
-    Extract TAG value from a Makefile.
+    Extract TAG value from a Makefile, calculating it if it references other variables.
 
     Args:
         makefile_path: Path to the Makefile
         ref: Git ref to read from (e.g., 'origin/main'). If None, reads from working tree.
-        componentPath: Repository root path (needed for git operations)
+        componentPath: Component path (needed for git operations)
 
     Returns:
         TAG value or None if not found
@@ -75,15 +76,43 @@ def get_makefile_tag(makefile_path: Path, ref: Optional[str] = None, componentPa
             # Read from working tree
             content = makefile_path.read_text()
 
-        # Match TAG= or TAG?= with optional whitespace
-        tag_match = re.search(r"^TAG\s*\??\s*=\s*(\S+)", content, re.MULTILINE)
-        if tag_match:
-            return tag_match.group(1)
-        return None
+        # Extract all variable definitions
+        variables = {}
+        for line in content.split('\n'):
+            # Match variable assignments: VAR?=value or VAR=value
+            var_match = re.match(
+                r'^(\w+)\s*\??\s*=\s*(.+?)(?:\s*#.*)?$', line.strip())
+            if var_match:
+                var_name = var_match.group(1)
+                var_value = var_match.group(2).strip()
+                variables[var_name] = var_value
+
+        # Get TAG value
+        tag_value = variables.get('TAG')
+        if not tag_value:
+            return None
+
+        # If TAG references other variables, resolve them
+        # Handle patterns like: $(VAR1)-$(VAR2) or v$(VAR1)-$(VAR2)
+        def resolve_variables(value: str) -> str:
+            # Replace $(VAR) with actual values
+            pattern = r'\$\((\w+)\)'
+            while re.search(pattern, value):
+                match = re.search(pattern, value)
+                if match:
+                    var_name = match.group(1)
+                    var_replacement = variables.get(var_name, match.group(0))
+                    value = value.replace(match.group(0), var_replacement)
+            return value
+
+        resolved_tag = resolve_variables(tag_value)
+        return resolved_tag
+
     except subprocess.CalledProcessError as e:
         # File doesn't exist in the ref or git error
         stderr = e.stderr.strip() if e.stderr else "unknown error"
-        print(f"   ⚠️  Warning: Could not read {makefile_path} from {ref}: {stderr}")
+        print(
+            f"   ⚠️  Warning: Could not read {makefile_path} from {ref}: {stderr}")
         return None
     except FileNotFoundError:
         return None
@@ -111,14 +140,15 @@ def check_component_version_bump(
 
     if not component_changed:
         return False, None
-    
+
     makefile_path = repo_root / component_path / "Makefile"
 
     if not makefile_path.exists():
         return True, f"❌ Makefile not found: {component_path}/Makefile"
 
     # Get TAG from base branch
-    base_tag = get_makefile_tag(makefile_path, f"origin/{base_ref}", component_path)
+    base_tag = get_makefile_tag(
+        makefile_path, f"origin/{base_ref}", component_path)
 
     # Get TAG from current branch
     head_tag = get_makefile_tag(makefile_path)
@@ -155,7 +185,7 @@ def main() -> int:
     base_ref = sys.argv[1] if len(sys.argv) > 1 else "main"
 
     repo_root = Path(__file__).parent.parent.parent
-    
+
     print("=" * 70)
     print("Checking Makefile version bumps for changed components...")
     print(f"Base branch: {base_ref}")
