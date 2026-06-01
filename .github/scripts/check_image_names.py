@@ -78,22 +78,54 @@ COMPONENTS = {
         ("ai-services/assets/applications/rag-dev/openshift/values.yaml", "postgres"),
         ("ai-services/assets/applications/rag-cpu/podman/values.yaml", "postgres"),
     ],
+    "images/litellm/Makefile": [
+        ("ai-services/assets/applications/rag-cpu/podman/values.yaml", "litellm"),
+    ],
+    "images/caddy/Makefile": [
+        ("ai-services/assets/catalog/podman/values.yaml", "caddy"),
+    ]
 }
 
 
 def get_makefile_info(makefile_path: Path) -> Tuple[str, str]:
-    """Extract IMAGE= and TAG= values from a Makefile."""
+    """Extract IMAGE= and TAG= values from a Makefile, calculating TAG if it references other variables."""
     content = makefile_path.read_text()
 
-    image_match = re.search(r"^IMAGE\s*\??=\s*(\S+)", content, re.MULTILINE)
-    if not image_match:
+    # Extract all variable definitions
+    variables = {}
+    for line in content.split('\n'):
+        # Match variable assignments: VAR?=value or VAR=value
+        var_match = re.match(r'^(\w+)\s*\??\s*=\s*(.+?)(?:\s*#.*)?$', line.strip())
+        if var_match:
+            var_name = var_match.group(1)
+            var_value = var_match.group(2).strip()
+            variables[var_name] = var_value
+
+    # Get IMAGE value
+    image = variables.get('IMAGE')
+    if not image:
         raise ValueError(f"Could not find IMAGE= in {makefile_path}")
 
-    tag_match = re.search(r"^TAG\s*\??=\s*(\S+)", content, re.MULTILINE)
-    if not tag_match:
+    # Get TAG value
+    tag_value = variables.get('TAG')
+    if not tag_value:
         raise ValueError(f"Could not find TAG= in {makefile_path}")
 
-    return image_match.group(1), tag_match.group(1)
+    # If TAG references other variables, resolve them
+    # Handle patterns like: $(VAR1)-$(VAR2) or v$(VAR1)-$(VAR2)
+    def resolve_variables(value: str) -> str:
+        # Replace $(VAR) with actual values
+        pattern = r'\$\((\w+)\)'
+        while re.search(pattern, value):
+            match = re.search(pattern, value)
+            if match:
+                var_name = match.group(1)
+                var_replacement = variables.get(var_name, match.group(0))
+                value = value.replace(match.group(0), var_replacement)
+        return value
+
+    resolved_tag = resolve_variables(tag_value)
+    return image, resolved_tag
 
 
 def get_image_from_values_yaml(values_path: Path, key: str) -> Tuple[Optional[str], Optional[str]]:
