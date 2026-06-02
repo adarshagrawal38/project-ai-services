@@ -23,6 +23,7 @@ var (
 
 // Ensure types package is imported for Swagger documentation.
 var _ types.ApplicationListResponse
+var _ types.ApplicationPSResponse
 
 // ApplicationHandler handles application-related HTTP requests.
 type ApplicationHandler struct {
@@ -312,6 +313,20 @@ func (h *ApplicationHandler) handleDeleteError(c *gin.Context, err error) {
 	}
 }
 
+// ApplicationPS godoc
+//
+//	@Summary		Get application process status
+//	@Description	Retrieves the process status and runtime information for an application
+//	@Tags			Applications
+//	@Produce		json
+//	@Security		BearerAuth
+//	@Param			id	path		string	true	"Application ID (UUID)"
+//	@Success		200	{object}	types.ApplicationPSResponse
+//	@Failure		400	{object}	ErrorResponse	"Invalid application ID format"
+//	@Failure		401	{object}	ErrorResponse	"Unauthorized"
+//	@Failure		404	{object}	ErrorResponse	"Application not found"
+//	@Failure		500	{object}	ErrorResponse	"Internal Server Error"
+//	@Router			/applications/{id}/ps [get]
 func (h *ApplicationHandler) ApplicationPS(c *gin.Context) {
 	appID, err := uuid.Parse(c.Param("id"))
 	if err != nil {

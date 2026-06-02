@@ -57,10 +57,10 @@ type ApplicationPSResponse struct {
 }
 
 type PodDetails struct {
-	PodID      string   `json:"pod_id"`
-	PodName    string   `json:"pod_name"`
-	Status     string   `json:"status"`
-	Created    string   `json:"created"`
+	PodID      string         `json:"pod_id"`
+	PodName    string         `json:"pod_name"`
+	Status     string         `json:"status"`
+	Created    string         `json:"created"`
 	Containers []PodContainer `json:"containers"`
 }
 

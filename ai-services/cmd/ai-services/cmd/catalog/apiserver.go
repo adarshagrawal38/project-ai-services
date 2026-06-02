@@ -99,7 +99,6 @@ func runAPIServer(port int, accessTTL, refreshTTL time.Duration, adminUser, admi
 	// Create application instance using factory
 	rt := vars.RuntimeFactory.GetRuntimeType()
 	factory := application.NewFactory(rt)
-	
 
 	catalogProvider, err := catalog.NewCatalogProvider()
 	if err != nil {
