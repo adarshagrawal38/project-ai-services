@@ -17,6 +17,10 @@ import (
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/types"
 )
 
+var (
+	ErrInvalidIDParameter = ErrorResponse{Error: "Invalid application ID format"}
+)
+
 // Ensure types package is imported for Swagger documentation.
 var _ types.ApplicationListResponse
 
@@ -119,7 +123,7 @@ func (h *ApplicationHandler) ListApplications(c *gin.Context) {
 func (h *ApplicationHandler) UpdateApplication(c *gin.Context) {
 	appID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid application ID format"})
+		c.JSON(http.StatusBadRequest, ErrInvalidIDParameter)
 
 		return
 	}
@@ -223,7 +227,7 @@ func (h *ApplicationHandler) CreateApplication(c *gin.Context) {
 func (h *ApplicationHandler) GetApplicationByID(c *gin.Context) {
 	appID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "Invalid application ID format"})
+		c.JSON(http.StatusBadRequest, ErrInvalidIDParameter)
 
 		return
 	}
@@ -267,7 +271,7 @@ func (h *ApplicationHandler) GetApplicationByID(c *gin.Context) {
 func (h *ApplicationHandler) DeleteApplication(c *gin.Context) {
 	appID, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{Error: "invalid application ID format, expected UUID"})
+		c.JSON(http.StatusBadRequest, ErrInvalidIDParameter)
 
 		return
 	}
@@ -306,6 +310,31 @@ func (h *ApplicationHandler) handleDeleteError(c *gin.Context, err error) {
 	default:
 		c.JSON(http.StatusInternalServerError, ErrorResponse{Error: "internal server error"})
 	}
+}
+
+func (h *ApplicationHandler) ApplicationPS(c *gin.Context) {
+	appID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, ErrInvalidIDParameter)
+		return
+	}
+
+	response, err := h.appService.ApplicationsPs(c.Request.Context(), appID)
+	if err != nil {
+		if err == repository.ErrApplicationNotFound {
+			c.JSON(http.StatusNotFound, ErrorResponse{Error: "Application not found"})
+
+			return
+		}
+
+		c.JSON(http.StatusInternalServerError, ErrorResponse{
+			Error: fmt.Sprintf("Failed to get application: %v", err),
+		})
+
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // Made with Bob

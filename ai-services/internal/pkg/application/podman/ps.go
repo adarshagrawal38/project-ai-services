@@ -1,9 +1,12 @@
 package podman
 
 import (
+	"errors"
+
 	"github.com/project-ai-services/ai-services/internal/pkg/application/common"
 	appTypes "github.com/project-ai-services/ai-services/internal/pkg/application/types"
 	"github.com/project-ai-services/ai-services/internal/pkg/logger"
+	"github.com/project-ai-services/ai-services/internal/pkg/runtime/types"
 	"github.com/project-ai-services/ai-services/internal/pkg/utils"
 )
 
@@ -30,4 +33,17 @@ func (p *PodmanApplication) List(opts appTypes.ListOptions) ([]appTypes.Applicat
 	common.PopulateTable(p.runtime, opts, pods)
 
 	return nil, nil
+}
+
+func (p *PodmanApplication) GetPodByID(uuid string) (*types.Pod, error) {
+	pods, err := common.FetchTemplateFilteredPods(p.runtime, uuid)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(pods) == 0 {
+		logger.Infof("No Pods found for the given id: %s", uuid)
+		return nil, errors.New("pod not found")
+	}
+	return &pods[0], nil
 }

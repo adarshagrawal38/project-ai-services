@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/project-ai-services/ai-services/internal/pkg/application"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog"
 	apimodels "github.com/project-ai-services/ai-services/internal/pkg/catalog/apiserver/models"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/apiserver/services/deployment"
@@ -34,6 +36,7 @@ type ApplicationService struct {
 	provider              *catalog.CatalogProvider
 	deploymentPlanner     *deployment.DeploymentPlanner
 	deploymentExecutor    *deployment.DeploymentExecutor
+	factory               *application.Factory
 }
 
 // NewApplicationService creates a new application service.
@@ -43,6 +46,7 @@ func NewApplicationService(
 	componentRepo dbrepo.ComponentRepository,
 	serviceDependencyRepo dbrepo.ServiceDependencyRepository,
 	provider *catalog.CatalogProvider,
+	factory *application.Factory,
 ) *ApplicationService {
 	return &ApplicationService{
 		appRepo:               appRepo,
@@ -52,6 +56,7 @@ func NewApplicationService(
 		provider:              provider,
 		deploymentPlanner:     deployment.NewDeploymentPlanner(provider, componentRepo),
 		deploymentExecutor:    deployment.NewDeploymentExecutor(provider, appRepo, serviceRepo, componentRepo),
+		factory:               factory,
 	}
 }
 
@@ -659,6 +664,121 @@ func (s *ApplicationService) performDeletion(ctx context.Context, appID uuid.UUI
 			logger.Errorf("failed to delete orphaned component %s: %s", componentID, err)
 		}
 	}
+}
+
+func (s *ApplicationService) ApplicationsPs(ctx context.Context, appID uuid.UUID) (*types.ApplicationPSResponse, error) {
+
+	// Get the application.
+	app, err := s.appRepo.GetByID(ctx, appID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get application: %w", err)
+	}
+
+	appClient, err := s.factory.Create(app.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create application instance: %w", err)
+	}
+
+	fmt.Println("Application client created for: ", app.Name)
+
+	applicationPsResponse := &types.ApplicationPSResponse{
+		ID:         app.ID.String(),
+		Name:       app.Name,
+		Services:   []types.PodDetails{},
+		Components: []types.PodDetails{},
+	}
+
+	fmt.Println("Getting services od details")
+	for _, service := range app.Services {
+		fmt.Println("CATALOG ID: ", service.CatalogID)
+		fmt.Println("ID: ", service.ID)
+
+		podDetails, err := getPodByID(appClient, service.ID.String())
+		if err != nil {
+			continue
+		}
+
+		applicationPsResponse.Services = append(applicationPsResponse.Services, podDetails)
+	}
+
+	fmt.Println("Getting components pod details")
+	componentMap := map[string]types.PodDetails{}
+	podCompenet := []types.PodDetails{}
+	for _, service := range app.Services {
+		// Get all dependencies for this service
+		serviceDependencies, err := s.serviceDependencyRepo.GetDependenciesByServiceID(ctx, service.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get application dependencies: %w", err)
+		}
+
+		for _, sd := range serviceDependencies {
+			if sd.DependencyType == models.DependencyTypeComponent {
+				var podDetails types.PodDetails
+				if _, ok := componentMap[sd.DependencyID.String()]; ok {
+					logger.Infof("Container all-ready loaded in response for id: %s", sd.DependencyID.String())
+				} else {
+					podDetails, err = getPodByID(appClient, sd.DependencyID.String())
+					if err != nil {
+						continue
+					}
+
+					componentMap[sd.DependencyID.String()] = podDetails
+					podCompenet = append(podCompenet, podDetails)
+				}
+			}
+		}
+
+	}
+	applicationPsResponse.Components = podCompenet
+	return applicationPsResponse, nil
+}
+
+func getPodByID(appClient application.Application, uuid string) (types.PodDetails, error) {
+	logger.Infof("Loading pod details for id: %s", uuid)
+	pod, err := appClient.GetPodByID(uuid)
+	if err != nil {
+		logger.Errorf("failed to get pod details for % id: %w", uuid, err)
+		return types.PodDetails{}, err
+	}
+
+	// check container status of pod
+	isContainerRunning := true
+	containers := []types.PodContainer{}
+	for _, container := range pod.Containers {
+		status := container.Status
+
+		if strings.ToLower(status) != "running" {
+			isContainerRunning = false
+			status += " (unhealthy)"
+		} else {
+			status += " (healthy)"
+		}
+		podContainer := types.PodContainer{
+			Name:   container.Name,
+			Status: status,
+		}
+		containers = append(containers, podContainer)
+	}
+	podStatus := pod.Status
+	if strings.ToLower(podStatus) == "running" {
+		if isContainerRunning {
+			podStatus += " (healthy)"
+		}
+	} else {
+		// ALL container are not in running state, therefore setting status to unhealthy
+		podStatus += " (unhealthy)"
+	}
+	fmt.Println("PodID: ", pod.ID[:13])
+	fmt.Println("Pod Created: ", pod.Created.String())
+	podDetails := types.PodDetails{
+		PodID:      pod.ID[:13],
+		PodName:    pod.Name,
+		Status:     podStatus,
+		Created:    pod.Created.Format(constants.RFC3339WithTimezone),
+		Containers: containers,
+	}
+	return podDetails, nil
+
 }
 
 // Made with Bob

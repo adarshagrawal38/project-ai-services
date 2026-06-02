@@ -28,6 +28,21 @@ func FetchFilteredPods(r runtime.Runtime, appName string) ([]types.Pod, error) {
 	return pods, nil
 }
 
+// FetchFilteredPods Fetch all pods for a given app based on label.
+func FetchTemplateFilteredPods(r runtime.Runtime, uuid string) ([]types.Pod, error) {
+	listFilters := map[string][]string{}
+	if uuid != "" {
+		listFilters["label"] = []string{fmt.Sprintf("ai-services.io/template=%s", uuid)}
+	}
+
+	pods, err := r.ListPods(listFilters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list pods: %w", err)
+	}
+
+	return pods, nil
+}
+
 // PopulateTable Set table headers and rows.
 func PopulateTable(r runtime.Runtime, opts appTypes.ListOptions, pods []types.Pod) {
 	// fetch the table writer object

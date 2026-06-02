@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/project-ai-services/ai-services/internal/pkg/application"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/apiserver"
 	apirepository "github.com/project-ai-services/ai-services/internal/pkg/catalog/apiserver/repository"
@@ -95,13 +96,18 @@ func runAPIServer(port int, accessTTL, refreshTTL time.Duration, adminUser, admi
 	componentRepo := repository.NewComponentRepository(pool)
 	serviceDependencyRepo := repository.NewServiceDependencyRepository(pool)
 
+	// Create application instance using factory
+	rt := vars.RuntimeFactory.GetRuntimeType()
+	factory := application.NewFactory(rt)
+	
+
 	catalogProvider, err := catalog.NewCatalogProvider()
 	if err != nil {
 		return fmt.Errorf("failed to initialize catalog provider: %w", err)
 	}
 
 	// Initialize application service with all required repositories
-	applicationService := apirepository.NewApplicationService(applicationRepo, serviceRepo, componentRepo, serviceDependencyRepo, catalogProvider)
+	applicationService := apirepository.NewApplicationService(applicationRepo, serviceRepo, componentRepo, serviceDependencyRepo, catalogProvider, factory)
 
 	tokenMgr := auth.NewTokenManager(secretKey, accessTTL, refreshTTL)
 	authSvc := auth.NewAuthService(userRepo, tokenMgr, blacklist)
