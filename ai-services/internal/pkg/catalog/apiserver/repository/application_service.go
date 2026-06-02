@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/project-ai-services/ai-services/internal/pkg/application"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog"
 	apimodels "github.com/project-ai-services/ai-services/internal/pkg/catalog/apiserver/models"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/apiserver/services/deployment"
@@ -16,6 +18,7 @@ import (
 	dbrepo "github.com/project-ai-services/ai-services/internal/pkg/catalog/db/repository"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/types"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/utils"
+	internalConstants "github.com/project-ai-services/ai-services/internal/pkg/constants"
 	"github.com/project-ai-services/ai-services/internal/pkg/logger"
 	runtimeTypes "github.com/project-ai-services/ai-services/internal/pkg/runtime/types"
 )
@@ -34,6 +37,7 @@ type ApplicationService struct {
 	provider              *catalog.CatalogProvider
 	deploymentPlanner     *deployment.DeploymentPlanner
 	deploymentExecutor    *deployment.DeploymentExecutor
+	factory               *application.Factory
 }
 
 // NewApplicationService creates a new application service.
@@ -43,6 +47,7 @@ func NewApplicationService(
 	componentRepo dbrepo.ComponentRepository,
 	serviceDependencyRepo dbrepo.ServiceDependencyRepository,
 	provider *catalog.CatalogProvider,
+	factory *application.Factory,
 ) *ApplicationService {
 	return &ApplicationService{
 		appRepo:               appRepo,
@@ -52,6 +57,7 @@ func NewApplicationService(
 		provider:              provider,
 		deploymentPlanner:     deployment.NewDeploymentPlanner(provider, componentRepo),
 		deploymentExecutor:    deployment.NewDeploymentExecutor(provider, appRepo, serviceRepo, componentRepo),
+		factory:               factory,
 	}
 }
 
@@ -661,4 +667,203 @@ func (s *ApplicationService) performDeletion(ctx context.Context, appID uuid.UUI
 	}
 }
 
-// Made with Bob
+// ApplicationsPs retrieves the runtime status of an application including all its services and components.
+// It returns detailed information about pods, containers, and their health status.
+// This method is useful for monitoring and debugging deployed applications.
+func (s *ApplicationService) ApplicationsPs(ctx context.Context, appID uuid.UUID) (*types.ApplicationPSResponse, error) {
+	// Fetch application from database
+	app, err := s.appRepo.GetByID(ctx, appID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrApplicationNotFound
+		}
+		return nil, fmt.Errorf("failed to get application: %w", err)
+	}
+
+	// Create application client for runtime operations
+	appClient, err := s.factory.Create(app.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create application instance: %w", err)
+	}
+
+	logger.Infof("Application client created for: %s", app.Name)
+
+	// Collect service pod details
+	servicePods, err := s.collectServicePods(ctx, appClient, app.Services)
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect service pods: %w", err)
+	}
+
+	// Collect component pod details (deduplicated across services)
+	componentPods, err := s.collectComponentPods(ctx, appClient, app.Services)
+	if err != nil {
+		return nil, fmt.Errorf("failed to collect component pods: %w", err)
+	}
+
+	return &types.ApplicationPSResponse{
+		ID:         app.ID.String(),
+		Name:       app.Name,
+		Services:   servicePods,
+		Components: componentPods,
+	}, nil
+}
+
+// collectServicePods retrieves pod details for all services in the application.
+// It logs errors for individual services but continues processing remaining services.
+func (s *ApplicationService) collectServicePods(
+	ctx context.Context,
+	appClient application.Application,
+	services []models.Service,
+) ([]types.PodDetails, error) {
+	logger.Infof("Collecting pod details for %d services", len(services))
+
+	servicePods := make([]types.PodDetails, 0, len(services))
+
+	for _, service := range services {
+		// logger.Debugf("Processing service - CatalogID: %s, ID: %s", service.CatalogID, service.ID)
+
+		podDetails, err := s.getPodDetailsByID(appClient, service.ID.String())
+		if err != nil {
+			// Log error but continue processing other services
+			logger.Errorf("Failed to get pod details for service %s: %v", service.ID, err)
+			continue
+		}
+
+		servicePods = append(servicePods, podDetails)
+	}
+
+	logger.Infof("Successfully collected %d service pods", len(servicePods))
+	return servicePods, nil
+}
+
+// collectComponentPods retrieves pod details for all unique components across all services.
+// Components are deduplicated to avoid returning the same component multiple times.
+func (s *ApplicationService) collectComponentPods(
+	ctx context.Context,
+	appClient application.Application,
+	services []models.Service,
+) ([]types.PodDetails, error) {
+	logger.Infof("Collecting pod details for components")
+
+	// Use map to deduplicate components that are shared across multiple services
+	componentMap := make(map[string]types.PodDetails)
+
+	for _, service := range services {
+		// Get all dependencies for this service
+		serviceDependencies, err := s.serviceDependencyRepo.GetDependenciesByServiceID(ctx, service.ID)
+		if err != nil {
+			logger.Errorf("Failed to get dependencies for service %s: %v", service.ID, err)
+			continue
+		}
+
+		// Process component dependencies
+		for _, dependency := range serviceDependencies {
+			if dependency.DependencyType != models.DependencyTypeComponent {
+				continue
+			}
+
+			componentID := dependency.DependencyID.String()
+
+			// Skip if component already processed
+			if _, exists := componentMap[componentID]; exists {
+				continue
+			}
+
+			// Fetch pod details for component
+			podDetails, err := s.getPodDetailsByID(appClient, componentID)
+			if err != nil {
+				// Log error but continue processing other components
+				logger.Errorf("Failed to get pod details for component %s: %v", componentID, err)
+				continue
+			}
+
+			componentMap[componentID] = podDetails
+		}
+	}
+
+	// Convert map to slice
+	componentPods := make([]types.PodDetails, 0, len(componentMap))
+	for _, podDetails := range componentMap {
+		componentPods = append(componentPods, podDetails)
+	}
+
+	logger.Infof("Successfully collected %d unique component pods", len(componentPods))
+	return componentPods, nil
+}
+
+// getPodDetailsByID retrieves detailed information about a pod including its containers and health status.
+// It enriches the pod status with health indicators based on container states.
+func (s *ApplicationService) getPodDetailsByID(
+	appClient application.Application,
+	id string,
+) (types.PodDetails, error) {
+	// Fetch pod from runtime
+	pod, err := appClient.GetPodByID(id)
+	if err != nil {
+		return types.PodDetails{}, fmt.Errorf("failed to get pod details for ID %s: %w", id, err)
+	}
+
+	// Process container statuses and determine overall health
+	containers, allContainersHealthy := s.buildContainerStatuses(pod.Containers)
+
+	// Determine pod status with health indicator
+	podStatus := determinePodStatus(pod.Status, allContainersHealthy)
+
+	// Truncate pod ID to first 13 characters for display (similar to Docker/Podman convention)
+	truncatedPodID := pod.ID
+	if len(pod.ID) > 13 {
+		truncatedPodID = pod.ID[:13]
+	}
+
+	// logger.Debugf("Pod %s status: %s, containers: %d", truncatedPodID, podStatus, len(containers))
+
+	return types.PodDetails{
+		PodID:      truncatedPodID,
+		PodName:    pod.Name,
+		Status:     podStatus,
+		Created:    pod.Created.Format(constants.RFC3339WithTimezone),
+		Containers: containers,
+	}, nil
+}
+
+// buildContainerStatuses processes container information and enriches status with health indicators.
+// Returns the list of containers and a boolean indicating if all containers are healthy.
+func (s *ApplicationService) buildContainerStatuses(
+	containers []runtimeTypes.Container,
+) ([]types.PodContainer, bool) {
+	allHealthy := true
+	podContainers := make([]types.PodContainer, 0, len(containers))
+
+	for _, container := range containers {
+		status := container.Status
+		isRunning := strings.ToLower(status) == "running"
+
+		// Add health indicator to status
+		if isRunning {
+			status += fmt.Sprintf(" (%s)", string(internalConstants.Ready))
+		} else {
+			status += fmt.Sprintf(" (%s)", string(internalConstants.NotReady))
+			allHealthy = false
+		}
+
+		podContainers = append(podContainers, types.PodContainer{
+			Name:   container.Name,
+			Status: status,
+		})
+	}
+
+	return podContainers, allHealthy
+}
+
+// determinePodStatus evaluates the overall pod status and adds health indicators.
+// A pod is considered healthy only if it's running and all its containers are healthy.
+func determinePodStatus(podStatus string, allContainersHealthy bool) string {
+	isRunning := strings.ToLower(podStatus) == "running"
+
+	if isRunning && allContainersHealthy {
+		return fmt.Sprintf("%s (%s)", podStatus, string(internalConstants.Ready))
+	}
+
+	// Pod is either not running or has unhealthy containers
+	return fmt.Sprintf("%s (%s)", podStatus, string(internalConstants.NotReady))
+}

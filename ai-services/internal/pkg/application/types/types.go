@@ -55,6 +55,7 @@ type StopOptions struct {
 // ListOptions contains parameters for listing applications.
 type ListOptions struct {
 	ApplicationName string
+	ID              string
 	OutputWide      bool
 }
 

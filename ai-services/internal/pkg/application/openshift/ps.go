@@ -6,6 +6,7 @@ import (
 	"github.com/project-ai-services/ai-services/internal/pkg/application/common"
 	appTypes "github.com/project-ai-services/ai-services/internal/pkg/application/types"
 	"github.com/project-ai-services/ai-services/internal/pkg/logger"
+	runtimeTypes "github.com/project-ai-services/ai-services/internal/pkg/runtime/types"
 )
 
 // List returns information about running applications.
@@ -30,5 +31,10 @@ func (o *OpenshiftApplication) List(opts appTypes.ListOptions) ([]appTypes.Appli
 	// set table headers and rows
 	common.PopulateTable(o.runtime, opts, pods)
 
+	return nil, nil
+}
+
+func (o *OpenshiftApplication) GetPodByID(uuid string) (*runtimeTypes.Pod, error) {
+	// TODO: needs to be implemented
 	return nil, nil
 }

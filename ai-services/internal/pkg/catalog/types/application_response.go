@@ -48,4 +48,25 @@ type PaginationMetadata struct {
 	HasPrev    bool `json:"has_prev"`
 }
 
+// ApplicationPSResponse represents the response for pod/container status.
+type ApplicationPSResponse struct {
+	ID         string       `json:"id"`
+	Name       string       `json:"name"`
+	Services   []PodDetails `json:"services"`
+	Components []PodDetails `json:"components"`
+}
+
+type PodDetails struct {
+	PodID      string         `json:"pod_id"`
+	PodName    string         `json:"pod_name"`
+	Status     string         `json:"status"`
+	Created    string         `json:"created"`
+	Containers []PodContainer `json:"containers"`
+}
+
+type PodContainer struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+}
+
 // Made with Bob

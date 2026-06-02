@@ -32,4 +32,6 @@ type Application interface {
 
 	// Type returns the runtime type.
 	Type() runtimeTypes.RuntimeType
+
+	GetPodByID(uuid string) (*runtimeTypes.Pod, error)
 }
