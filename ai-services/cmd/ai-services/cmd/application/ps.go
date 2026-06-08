@@ -119,6 +119,9 @@ func buildPsFlagValidator() *flagvalidator.FlagValidator {
 func processApplication(appName string) error {
 	// Create application client with server URL and token
 	appClient, err := catalogClient.NewApplicationClient()
+	if err != nil {
+		return fmt.Errorf("failed to create application client: %v", err)
+	}
 
 	appIDList, err := getAppIDList(appClient, appName)
 	if err != nil {
