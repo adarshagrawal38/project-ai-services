@@ -14,7 +14,7 @@ import (
 	"github.com/project-ai-services/ai-services/internal/pkg/utils"
 )
 
-// populateApplication retrieves and displays application process status information.
+// PopulateApplication retrieves and displays application process status information.
 // It fetches either all applications or a specific application by name, then renders
 // the process status in a tabular format.
 func PopulateApplication(opts appTypes.ListOptions) error {
@@ -40,6 +40,7 @@ func fetchApplications(appClient *catalogClient.ApplicationClient, appName strin
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch all applications: %w", err)
 		}
+
 		return applicationList, nil
 	}
 

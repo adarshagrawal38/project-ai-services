@@ -8,9 +8,9 @@ import (
 	appTypes "github.com/project-ai-services/ai-services/internal/pkg/application/types"
 	appFlags "github.com/project-ai-services/ai-services/internal/pkg/cli/constants/application"
 	"github.com/project-ai-services/ai-services/internal/pkg/cli/flagvalidator"
+	cliUtils "github.com/project-ai-services/ai-services/internal/pkg/cli/utils"
 	"github.com/project-ai-services/ai-services/internal/pkg/runtime/types"
 	"github.com/project-ai-services/ai-services/internal/pkg/vars"
-	cliUtils "github.com/project-ai-services/ai-services/internal/pkg/cli/utils"
 	"github.com/spf13/cobra"
 )
 

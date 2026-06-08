@@ -27,5 +27,6 @@ func GetAppByName(appClient *catalogClient.ApplicationClient, appName string) (*
 			return &app, nil
 		}
 	}
+
 	return nil, fmt.Errorf("application with name '%s' not found", appName)
 }
