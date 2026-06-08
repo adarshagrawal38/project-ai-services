@@ -2,24 +2,23 @@ package client
 
 import (
 	"fmt"
-	"net/http"
 	"strconv"
 
-	"github.com/project-ai-services/ai-services/internal/pkg/catalog/httpclient"
+	"github.com/go-resty/resty/v2"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/types"
 )
 
 // ApplicationClient provides methods for interacting with the applications API.
 type ApplicationClient struct {
 	serverURL  string
-	httpClient *httpclient.HTTPClient
+	httpClient *resty.Client
 }
 
 // NewApplicationClient creates a new ApplicationClient with the given server URL and token.
 func NewApplicationClient(serverURL string) *ApplicationClient {
 	return &ApplicationClient{
 		serverURL:  serverURL,
-		httpClient: httpclient.New(serverURL),
+		httpClient: resty.New().SetBaseURL(serverURL),
 	}
 }
 
@@ -48,53 +47,55 @@ type ListApplicationsParams struct {
 //	    CatalogID: "rag",
 //	})
 func (c *ApplicationClient) ListApplications(params *ListApplicationsParams, token string) (*types.ApplicationListResponse, error) {
-	query := make(map[string]string)
+	var result types.ApplicationListResponse
+	req := c.httpClient.R().
+		SetHeader("Authorization", "Bearer "+token).
+		SetResult(&result)
 
 	if params != nil {
 		if params.Page > 0 {
-			query["page"] = strconv.Itoa(params.Page)
+			req.SetQueryParam("page", strconv.Itoa(params.Page))
 		}
 		if params.PageSize > 0 {
-			query["page_size"] = strconv.Itoa(params.PageSize)
+			req.SetQueryParam("page_size", strconv.Itoa(params.PageSize))
 		}
 		if params.DeploymentType != "" {
-			query["deployment_type"] = params.DeploymentType
+			req.SetQueryParam("deployment_type", params.DeploymentType)
 		}
 		if params.CatalogID != "" {
-			query["catalog_id"] = params.CatalogID
+			req.SetQueryParam("catalog_id", params.CatalogID)
 		}
 	}
 
-	var resp types.ApplicationListResponse
-	err := c.httpClient.Do(httpclient.Request{
-		Method:   http.MethodGet,
-		Endpoint: "/api/v1/applications",
-		Headers:  map[string]string{"Authorization": "Bearer " + token},
-		Query:    query,
-		Out:      &resp,
-	})
+	resp, err := req.Get("/api/v1/applications")
 	if err != nil {
 		return nil, fmt.Errorf("list applications: %w", err)
 	}
 
-	return &resp, nil
+	if resp.IsError() {
+		return nil, fmt.Errorf("list applications: server returned HTTP %d", resp.StatusCode())
+	}
+
+	return &result, nil
 }
 
 // GetApplicationPS retrieves the process status and runtime information for an application.
 // It returns details about pods, containers, and their health status.
 func (c *ApplicationClient) GetApplicationPS(id string, token string) (*types.ApplicationPSResponse, error) {
-	var psResp types.ApplicationPSResponse
-	err := c.httpClient.Do(httpclient.Request{
-		Method:   http.MethodGet,
-		Endpoint: fmt.Sprintf("/api/v1/applications/%s/ps", id),
-		Headers:  map[string]string{"Authorization": "Bearer " + token},
-		Out:      &psResp,
-	})
+	var result types.ApplicationPSResponse
+	resp, err := c.httpClient.R().
+		SetHeader("Authorization", "Bearer "+token).
+		SetResult(&result).
+		Get(fmt.Sprintf("/api/v1/applications/%s/ps", id))
 	if err != nil {
 		return nil, fmt.Errorf("get application ps: %w", err)
 	}
 
-	return &psResp, nil
+	if resp.IsError() {
+		return nil, fmt.Errorf("get application ps: server returned HTTP %d", resp.StatusCode())
+	}
+
+	return &result, nil
 }
 
 // Made with Bob
