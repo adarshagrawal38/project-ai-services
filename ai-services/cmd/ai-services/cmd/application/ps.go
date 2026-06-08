@@ -13,6 +13,7 @@ import (
 	appFlags "github.com/project-ai-services/ai-services/internal/pkg/cli/constants/application"
 	"github.com/project-ai-services/ai-services/internal/pkg/cli/flagvalidator"
 	"github.com/project-ai-services/ai-services/internal/pkg/constants"
+	"github.com/project-ai-services/ai-services/internal/pkg/logger"
 	"github.com/project-ai-services/ai-services/internal/pkg/runtime/types"
 	"github.com/project-ai-services/ai-services/internal/pkg/utils"
 	"github.com/project-ai-services/ai-services/internal/pkg/vars"
@@ -117,16 +118,15 @@ func buildPsFlagValidator() *flagvalidator.FlagValidator {
 
 func processApplication(appName string) error {
 	// Read base URL from environment variable with fallback
-	baseURL := utils.GetEnv("CATALOG_API_BASE_URL", "")
-
-	token, err := getAccessToken()
+	client, err := catalogClient.New()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load credentials: %v", err)
 	}
-	// Create application client with server URL and token
-	appClient := catalogClient.NewApplicationClient(baseURL, token)
 
-	appIds, err := getAppIds(appClient, appName, token)
+	// Create application client with server URL and token
+	appClient := catalogClient.NewApplicationClient(client.ServerURL())
+
+	appIds, err := getAppIds(appClient, appName, client.AccessToken())
 	if err != nil {
 		return err
 	}
@@ -134,20 +134,7 @@ func processApplication(appName string) error {
 		return fmt.Errorf("no application found with name %s", appName)
 	}
 
-	return render(appClient, appIds, token)
-}
-
-// getAccessToken retrieves the access token from the stored credentials.
-// It uses the catalog client to load credentials from the config file.
-func getAccessToken() (string, error) {
-	// Create a new client which loads credentials from config
-	client, err := catalogClient.New()
-	if err != nil {
-		return "", fmt.Errorf("failed to load credentials: %w", err)
-	}
-
-	// Return the access token
-	return client.AccessToken(), nil
+	return render(appClient, appIds, client.AccessToken())
 }
 
 // getAppIds retrieves application ID(s) from the catalog API.
@@ -155,7 +142,7 @@ func getAccessToken() (string, error) {
 // If appName is provided, returns the ID of the matching application.
 func getAppIds(appClient *catalogClient.ApplicationClient, appName string, token string) ([]string, error) {
 	// List all applications
-	resp, err := appClient.ListApplications(nil)
+	resp, err := appClient.ListApplications(nil, token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch applications: %w", err)
 	}
@@ -195,9 +182,9 @@ func render(appClient *catalogClient.ApplicationClient, appIds []string, token s
 	// Process each application ID
 	for _, appID := range appIds {
 		// Get PS information for the application
-		psResp, err := appClient.GetApplicationPS(appID)
+		psResp, err := appClient.GetApplicationPS(appID, token)
 		if err != nil {
-			fmt.Printf("Error fetching PS for application %s: %v\n", appID, err)
+			logger.Errorf("Error fetching PS for application %s: %v\n", appID, err)
 
 			continue
 		}

@@ -12,15 +12,13 @@ import (
 // ApplicationClient provides methods for interacting with the applications API.
 type ApplicationClient struct {
 	serverURL  string
-	token      string
 	httpClient *httpclient.HTTPClient
 }
 
 // NewApplicationClient creates a new ApplicationClient with the given server URL and token.
-func NewApplicationClient(serverURL, token string) *ApplicationClient {
+func NewApplicationClient(serverURL string) *ApplicationClient {
 	return &ApplicationClient{
 		serverURL:  serverURL,
-		token:      token,
 		httpClient: httpclient.New(serverURL),
 	}
 }
@@ -49,7 +47,7 @@ type ListApplicationsParams struct {
 //	    DeploymentType: "services",
 //	    CatalogID: "rag",
 //	})
-func (c *ApplicationClient) ListApplications(params *ListApplicationsParams) (*types.ApplicationListResponse, error) {
+func (c *ApplicationClient) ListApplications(params *ListApplicationsParams, token string) (*types.ApplicationListResponse, error) {
 	query := make(map[string]string)
 
 	if params != nil {
@@ -71,7 +69,7 @@ func (c *ApplicationClient) ListApplications(params *ListApplicationsParams) (*t
 	err := c.httpClient.Do(httpclient.Request{
 		Method:   http.MethodGet,
 		Endpoint: "/api/v1/applications",
-		Headers:  map[string]string{"Authorization": "Bearer " + c.token},
+		Headers:  map[string]string{"Authorization": "Bearer " + token},
 		Query:    query,
 		Out:      &resp,
 	})
@@ -84,12 +82,12 @@ func (c *ApplicationClient) ListApplications(params *ListApplicationsParams) (*t
 
 // GetApplicationPS retrieves the process status and runtime information for an application.
 // It returns details about pods, containers, and their health status.
-func (c *ApplicationClient) GetApplicationPS(id string) (*types.ApplicationPSResponse, error) {
+func (c *ApplicationClient) GetApplicationPS(id string, token string) (*types.ApplicationPSResponse, error) {
 	var psResp types.ApplicationPSResponse
 	err := c.httpClient.Do(httpclient.Request{
 		Method:   http.MethodGet,
 		Endpoint: fmt.Sprintf("/api/v1/applications/%s/ps", id),
-		Headers:  map[string]string{"Authorization": "Bearer " + c.token},
+		Headers:  map[string]string{"Authorization": "Bearer " + token},
 		Out:      &psResp,
 	})
 	if err != nil {
