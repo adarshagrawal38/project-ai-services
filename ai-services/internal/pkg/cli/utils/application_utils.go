@@ -1,10 +1,8 @@
 package utils
 
 import (
-	"encoding/json"
 	"fmt"
 
-	"github.com/go-resty/resty/v2"
 	catalogClient "github.com/project-ai-services/ai-services/internal/pkg/catalog/client"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/types"
 )
