@@ -28,7 +28,11 @@ func PopulateApplication(opts appTypes.ListOptions) error {
 		return err
 	}
 
-	return render(appClient, opts.OutputWide, applicationList)
+	if len(applicationList) == 0 {
+		return fmt.Errorf("no application found")
+	}
+
+	return renderApplicationPS(appClient, opts.OutputWide, applicationList)
 }
 
 // fetchApplications retrieves either all applications or a specific application by name.
@@ -53,15 +57,15 @@ func fetchApplications(appClient *catalogClient.ApplicationClient, appName strin
 	return []catalogTypes.Application{*application}, nil
 }
 
-// render retrieves and processes the PS information for multiple application IDs.
+// renderApplicationPS retrieves and processes the PS information for multiple application IDs.
 // It fetches the process status for each application using the catalog API and prints the results in tabular format.
-func render(appClient *catalogClient.ApplicationClient, outputWide bool, applicationList []catalogTypes.Application) error {
+func renderApplicationPS(appClient *catalogClient.ApplicationClient, outputWide bool, applicationList []catalogTypes.Application) error {
 	// Create table writer
 	printer := utils.NewTableWriter()
 	defer printer.CloseTableWriter()
 
 	// Set table headers based on output format
-	setTableHeaders(printer, outputWide)
+	setApplicationPSTableHeaders(printer, outputWide)
 
 	// Process each application ID
 	for _, app := range applicationList {
@@ -89,8 +93,8 @@ func render(appClient *catalogClient.ApplicationClient, outputWide bool, applica
 	return nil
 }
 
-// setTableHeaders sets the table headers based on output format.
-func setTableHeaders(printer *utils.Printer, outputWide bool) {
+// setApplicationPSTableHeaders sets the table headers based on output format.
+func setApplicationPSTableHeaders(printer *utils.Printer, outputWide bool) {
 	if outputWide {
 		printer.SetHeaders("APPLICATION NAME", "POD ID", "POD NAME", "STATUS", "CREATED", "CONTAINERS")
 	} else {
