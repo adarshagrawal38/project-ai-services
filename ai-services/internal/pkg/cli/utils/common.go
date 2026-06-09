@@ -5,41 +5,16 @@ import (
 	"strings"
 	"time"
 
-	appTypes "github.com/project-ai-services/ai-services/internal/pkg/application/types"
 	catalogClient "github.com/project-ai-services/ai-services/internal/pkg/catalog/client"
 	catalogConstants "github.com/project-ai-services/ai-services/internal/pkg/catalog/constants"
 	catalogTypes "github.com/project-ai-services/ai-services/internal/pkg/catalog/types"
 	"github.com/project-ai-services/ai-services/internal/pkg/constants"
-	"github.com/project-ai-services/ai-services/internal/pkg/logger"
 	"github.com/project-ai-services/ai-services/internal/pkg/utils"
 )
 
-// PopulateApplication retrieves and displays application process status information.
-// It fetches either all applications or a specific application by name, then renders
-// the process status in a tabular format.
-func PopulateApplication(opts appTypes.ListOptions) error {
-	appClient, err := catalogClient.NewApplicationClient()
-	if err != nil {
-		return fmt.Errorf("failed to create application client: %w", err)
-	}
-
-	applicationList, err := fetchApplications(appClient, opts.ApplicationName)
-	if err != nil {
-		return err
-	}
-
-	if len(applicationList) == 0 {
-		logger.Warningf("No application found")
-
-		return nil
-	}
-
-	return renderApplicationPS(appClient, opts.OutputWide, applicationList)
-}
-
-// fetchApplications retrieves either all applications or a specific application by name.
+// FetchApplications retrieves either all applications or a specific application by name.
 // If appName is empty, it fetches all applications. Otherwise, it fetches the specified application.
-func fetchApplications(appClient *catalogClient.ApplicationClient, appName string) ([]catalogTypes.Application, error) {
+func FetchApplications(appClient *catalogClient.ApplicationClient, appName string) ([]catalogTypes.Application, error) {
 	if appName == "" {
 		// Fetch all applications when no specific name is provided
 		applicationList, err := GetAllApps(appClient)
@@ -59,51 +34,8 @@ func fetchApplications(appClient *catalogClient.ApplicationClient, appName strin
 	return []catalogTypes.Application{*application}, nil
 }
 
-// renderApplicationPS retrieves and processes the PS information for multiple application IDs.
-// It fetches the process status for each application using the catalog API and prints the results in tabular format.
-func renderApplicationPS(appClient *catalogClient.ApplicationClient, outputWide bool, applicationList []catalogTypes.Application) error {
-	// Create table writer
-	printer := utils.NewTableWriter()
-	defer printer.CloseTableWriter()
-
-	// Set table headers based on output format
-	setApplicationPSTableHeaders(printer, outputWide)
-
-	// Process each application ID
-	for _, app := range applicationList {
-		// Get PS information for the application
-		psResp, err := appClient.GetApplicationPS(app.ID)
-		if err != nil {
-			return fmt.Errorf("failed to fetch application: %w", err)
-		}
-
-		// Process services pods
-		for _, pod := range psResp.Services {
-			rows := buildPodRowFromAPI(psResp.Name, pod, outputWide)
-			printer.AppendRow(rows...)
-		}
-
-		// Process components pods
-		for _, pod := range psResp.Components {
-			rows := buildPodRowFromAPI(psResp.Name, pod, outputWide)
-			printer.AppendRow(rows...)
-		}
-	}
-
-	return nil
-}
-
-// setApplicationPSTableHeaders sets the table headers based on output format.
-func setApplicationPSTableHeaders(printer *utils.Printer, outputWide bool) {
-	if outputWide {
-		printer.SetHeaders("APPLICATION NAME", "POD ID", "POD NAME", "STATUS", "CREATED", "CONTAINERS")
-	} else {
-		printer.SetHeaders("APPLICATION NAME", "POD NAME", "STATUS")
-	}
-}
-
-// buildPodRowFromAPI builds a table row from API response data.
-func buildPodRowFromAPI(appName string, pod catalogTypes.Pod, wideOutput bool) []string {
+// BuildPodRowFromAPI builds a table row from API response data.
+func BuildPodRowFromAPI(appName string, pod catalogTypes.Pod, wideOutput bool) []string {
 	status := getPodStatusFromAPI(pod)
 
 	// If wide option flag is not set, return appName, podName and status only
