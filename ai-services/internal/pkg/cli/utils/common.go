@@ -30,6 +30,7 @@ func PopulateApplication(opts appTypes.ListOptions) error {
 
 	if len(applicationList) == 0 {
 		logger.Warningf("No application found")
+
 		return nil
 	}
 
