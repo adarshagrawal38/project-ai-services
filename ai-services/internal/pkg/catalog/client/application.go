@@ -1,23 +1,18 @@
 package client
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/types"
+	"github.com/project-ai-services/ai-services/internal/pkg/utils"
 )
 
 // ApplicationClient provides methods for interacting with the applications API.
 type ApplicationClient struct {
 	httpClient *resty.Client
 	client     *Client
-}
-
-// ErrorResponse represents an error response.
-type ErrorResponse struct {
-	Error string `json:"error"`
 }
 
 // NewApplicationClient creates a new ApplicationClient with the given server URL and token.
@@ -84,7 +79,7 @@ func (c *ApplicationClient) ListApplications(params *ListApplicationsParams) (*t
 	}
 
 	if resp.IsError() {
-		return nil, fmt.Errorf("list applications: server returned HTTP %d: %s", resp.StatusCode(), parseErrorResponse(resp))
+		return nil, fmt.Errorf("list applications: server returned HTTP %d: %s", resp.StatusCode(), utils.ParseErrorResponse(resp))
 	}
 
 	return &result, nil
@@ -103,21 +98,10 @@ func (c *ApplicationClient) GetApplicationPS(id string) (*types.ApplicationPSRes
 	}
 
 	if resp.IsError() {
-		return nil, fmt.Errorf("get application ps: server returned HTTP %d: %s", resp.StatusCode(), parseErrorResponse(resp))
+		return nil, fmt.Errorf("get application ps: server returned HTTP %d: %s", resp.StatusCode(), utils.ParseErrorResponse(resp))
 	}
 
 	return &result, nil
-}
-
-// parseErrorResponse attempts to parse the error response from the API.
-// It returns the error message if successfully parsed, otherwise returns the raw response body.
-func parseErrorResponse(resp *resty.Response) string {
-	var errResp ErrorResponse
-	if err := json.Unmarshal(resp.Body(), &errResp); err == nil && errResp.Error != "" {
-		return errResp.Error
-	}
-
-	return resp.String()
 }
 
 // Made with Bob

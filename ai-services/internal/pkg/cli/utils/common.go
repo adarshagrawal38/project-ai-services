@@ -29,7 +29,8 @@ func PopulateApplication(opts appTypes.ListOptions) error {
 	}
 
 	if len(applicationList) == 0 {
-		return fmt.Errorf("no application found")
+		logger.Warningf("No application found")
+		return nil
 	}
 
 	return renderApplicationPS(appClient, opts.OutputWide, applicationList)
