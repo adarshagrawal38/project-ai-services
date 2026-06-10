@@ -41,7 +41,8 @@ type RepairResult struct {
 
 // Repair attempts to fix all failed Spyre checks.
 func Repair(checks []check.CheckResult) []RepairResult {
-	var results []RepairResult
+	const checkResultsLen = 11
+	results := make([]RepairResult, 0, checkResultsLen)
 
 	// Create a map for easy lookup.
 	checkMap := make(map[string]check.CheckResult)
