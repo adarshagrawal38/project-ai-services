@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"google.golang.org/grpc/balancer/base"
 
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/cli/configure"
 	catalogPodman "github.com/project-ai-services/ai-services/internal/pkg/catalog/cli/configure/podman"
@@ -113,6 +114,11 @@ func runConfigure() error {
 func validateResetFlags(cmd *cobra.Command) error {
 	if err := validateRuntimeFlag(); err != nil {
 		return err
+	}
+
+	// Check if basedir was explicitly setn
+	if baseDir != "" {
+		return fmt.Errorf("--base-dir cannot be used with --reset-password")
 	}
 
 	// Check if domain-name was explicitly set
