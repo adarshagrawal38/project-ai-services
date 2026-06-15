@@ -49,7 +49,7 @@ func ResetCatalogPassword() error {
 		HttpsPort:  httpsPort,
 	}
 
-	 _, err = executeCatalogDeployment(context.Background(), deployCtx, opts, passwordHash)
+	_, err = executeCatalogDeployment(context.Background(), deployCtx, opts, passwordHash)
 	if err != nil {
 		return fmt.Errorf("failed to deploy catalog pod: %w", err)
 	}
