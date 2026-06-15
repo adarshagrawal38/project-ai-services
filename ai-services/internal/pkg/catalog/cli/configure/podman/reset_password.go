@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/project-ai-services/ai-services/internal/pkg/catalog/cli/common/podman/deploy"
 	catalogConstant "github.com/project-ai-services/ai-services/internal/pkg/catalog/constants"
 	"github.com/project-ai-services/ai-services/internal/pkg/logger"
 	"github.com/project-ai-services/ai-services/internal/pkg/runtime"
@@ -17,29 +18,38 @@ const (
 )
 
 func ResetCatalogPassword() error {
-	rt, err := vars.RuntimeFactory.Create("")
+	// Create deployment context without argParams for status check
+	deployCtx, err := deploy.NewDeployContext()
 	if err != nil {
-		return fmt.Errorf("failed to create runtime: %w", err)
+		return err
+	}
+
+	// Collect new password
+	// Terminate reset process when failed to collect password
+	passwordHash, err := collectAndHashPassword(deployCtx.Runtime)
+	if err != nil {
+		return err
 	}
 
 	logger.Infof("Deleting catalog secret %s", catalogConstant.CatalogSecretName)
-	err = rt.DeleteSecret(catalogConstant.CatalogSecretName)
+	err = deployCtx.Runtime.DeleteSecret(catalogConstant.CatalogSecretName)
 	if err != nil {
 		return fmt.Errorf("failed to delete existing catalog secret: %w", err)
 	}
 
-	podEnv, err := processCatalogPod(rt)
+	podEnv, err := processCatalogPod(deployCtx.Runtime)
 	if err != nil {
 		return fmt.Errorf("failed to get existing catalog pod details: %w", err)
 	}
 
 	baseDir, domainName, httpsPort := getFlagValues(podEnv)
-	_, _, err = ExecuteCatalogDeployment(context.Background(), PodmanConfigureOptions{
+	opts := PodmanConfigureOptions{
 		BaseDir:    baseDir,
 		DomainName: domainName,
 		HttpsPort:  httpsPort,
-	})
+	}
 
+	_, _, err = ExecuteCatalogDeployment(context.Background(), deployCtx, opts, passwordHash)
 	if err != nil {
 		return fmt.Errorf("failed to deploy catalog pod: %w", err)
 	}

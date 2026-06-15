@@ -31,7 +31,21 @@ type PodmanConfigureOptions struct {
 
 // DeployCatalog deploys the catalog service using the assets/catalog template for podman runtime.
 func DeployCatalog(ctx context.Context, opts PodmanConfigureOptions) error {
-	deployCtx, caddyCtx, err := ExecuteCatalogDeployment(ctx, opts)
+
+	// Create deployment context without argParams for status check
+	deployCtx, err := deploy.NewDeployContext()
+	if err != nil {
+		return err
+	}
+
+	// Collect and hash password
+	// If secret exist passwordHash will be empty
+	passwordHash, err := collectAndHashPassword(deployCtx.Runtime)
+	if err != nil {
+		return err
+	}
+
+	deployCtx, caddyCtx, err := ExecuteCatalogDeployment(ctx, deployCtx, opts, passwordHash)
 	if err != nil {
 		return err
 	}
@@ -44,21 +58,8 @@ func DeployCatalog(ctx context.Context, opts PodmanConfigureOptions) error {
 	return handlePostDeployment(caddyCtx, deployCtx)
 }
 
-func ExecuteCatalogDeployment(ctx context.Context, opts PodmanConfigureOptions) (*deploy.DeployContext, *caddy.Context, error) {
+func ExecuteCatalogDeployment(ctx context.Context, deployCtx *deploy.DeployContext, opts PodmanConfigureOptions, passwordHash string) (*deploy.DeployContext, *caddy.Context, error) {
 	logger.Infoln("started configuring catalog service...", logger.VerbosityLevelDebug)
-
-	// Create deployment context without argParams for status check
-	deployCtx, err := deploy.NewDeployContext()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// Collect and hash password
-	// If secret exist passwordHash will be empty
-	passwordHash, err := collectAndHashPassword(deployCtx.Runtime)
-	if err != nil {
-		return nil, nil, err
-	}
 
 	s := spinner.New("Configuring catalog service...")
 	s.Start(ctx)
