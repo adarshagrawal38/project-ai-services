@@ -31,7 +31,6 @@ type PodmanConfigureOptions struct {
 
 // DeployCatalog deploys the catalog service using the assets/catalog template for podman runtime.
 func DeployCatalog(ctx context.Context, opts PodmanConfigureOptions) error {
-
 	// Create deployment context without argParams for status check
 	deployCtx, err := deploy.NewDeployContext()
 	if err != nil {
