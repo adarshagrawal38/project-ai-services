@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/spf13/cobra"
 
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/cli/configure"
+	catalogConstant "github.com/project-ai-services/ai-services/internal/pkg/catalog/constants"
 	"github.com/project-ai-services/ai-services/internal/pkg/constants"
 	"github.com/project-ai-services/ai-services/internal/pkg/logger"
 	"github.com/project-ai-services/ai-services/internal/pkg/runtime"
@@ -27,10 +29,13 @@ var (
 	sslKeyPath  string
 	// HTTPS port flag for catalog configure command.
 	httpsPort int
+	// Reset password flag for catalog configure command.
+	resetPasswordFlag bool
 )
 
 const (
-	defaultHTTPSPort = 443
+	defaultHTTPSPort     = 443
+	catalogContainerName = "ai-services--catalog-backend"
 )
 
 // NewConfigureCmd creates a new configure command for the catalog service.
@@ -52,6 +57,10 @@ Examples:
 			return validateConfigureFlags()
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if resetPasswordFlag {
+				return resetCatalogPassword()
+			}
+
 			return runConfigure()
 		},
 	}
@@ -234,6 +243,109 @@ func configureConfigureFlags(cmd *cobra.Command) {
 			"Must be used together with --ssl-cert.\n"+
 			"Example: --ssl-key /path/to/key.pem\n",
 	)
+
+	cmd.Flags().BoolVar(
+		&resetPasswordFlag,
+		"reset-password",
+		false,
+		"Reset the password for the admin user",
+	)
+}
+
+func resetCatalogPassword() error {
+	rt, err := vars.RuntimeFactory.Create("")
+	if err != nil {
+		return fmt.Errorf("failed to create runtime: %w", err)
+	}
+
+	secretExists, err := rt.SecretExists(catalogConstant.CatalogSecretName)
+	if err != nil {
+		return fmt.Errorf("failed to check existing secrets: %w", err)
+	}
+
+	if secretExists {
+		// Delete existing secret
+		logger.Infof("Deleting existing catalog secret %s", catalogConstant.CatalogSecretName)
+		err = rt.DeleteSecret(catalogConstant.CatalogSecretName)
+		if err != nil {
+			return fmt.Errorf("failed to delete existing catalog secret: %w", err)
+		}
+	}
+
+	podId, podEnv, err := getCatalogPodDetails(rt)
+	if err != nil {
+		return fmt.Errorf("failed to get existing catalog pod details: %w", err)
+	}
+
+	logger.Infof("Deleting existing catalog pod %s", podId)
+	err = rt.DeletePod(podId, utils.BoolPtr(true))
+	if err != nil {
+		return fmt.Errorf("failed to delete existing catalog pod: %w", err)
+	}
+
+	setGlobalFlagValues(podEnv)
+
+	// Deploy
+	return configure.Run(vars.RuntimeFactory.GetRuntimeType(), baseDir, domainName, "", "", httpsPort)
+}
+
+func setGlobalFlagValues(podEnv map[string]string) {
+	// Setting baseDir global variable
+	if value, ok := podEnv["AI_SERVICES_BASE_DIR"]; ok {
+		baseDir = value
+	}
+
+	// Setting domainName global variable
+	if value, ok := podEnv["DOMAIN_SUFFIX"]; ok {
+		domainName = value
+	}
+
+	// Setting httpsPort global variable
+	if value, ok := podEnv["CADDY_HTTPS_PORT"]; ok {
+		httpsPort, _ = strconv.Atoi(value)
+	}
+}
+
+func getCatalogPodDetails(rt runtime.Runtime) (string, map[string]string, error) {
+	// Build filter to find all pods using the catalog secret via label
+	logger.Infof("Getting catalog pod details")
+	filter := map[string][]string{
+		"label": {fmt.Sprintf(
+			"%s=%s",
+			catalogConstant.CatalogSecretLabel,
+			catalogConstant.CatalogSecretName,
+		)},
+	}
+
+	// List all pods that reference the catalog secret
+	pods, err := rt.ListPods(filter)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to list pods: %w", err)
+	}
+	if len(pods) == 0 {
+		return "", nil, fmt.Errorf("no catalog pod found")
+	}
+
+	// Inspect catalog pod
+	pod := pods[0]
+	pInfo, err := rt.InspectPod(pod.ID)
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to inspect pod %s: %w", pod.Name, err)
+	}
+
+	for _, container := range pInfo.Containers {
+		if container.Name == catalogContainerName {
+			// Inspect container for get hold of envs
+			cInfo, err := rt.InspectContainer(container.ID)
+			if err != nil {
+				return "", nil, fmt.Errorf("failed to inspect container %s: %w", container.Name, err)
+			}
+
+			return pod.ID, cInfo.Env, nil
+		}
+	}
+
+	return "", nil, fmt.Errorf("failed to find catalog container in pod %s", pod.Name)
 }
 
 // Made with Bob
