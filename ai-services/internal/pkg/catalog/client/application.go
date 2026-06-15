@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/go-resty/resty/v2"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/types"
 	"github.com/project-ai-services/ai-services/internal/pkg/utils"
 )
@@ -18,8 +17,7 @@ const (
 
 // ApplicationClient provides methods for interacting with the applications API.
 type ApplicationClient struct {
-	httpClient *resty.Client
-	client     *Client
+	client *Client
 }
 
 // NewApplicationClient creates a new ApplicationClient with the given server URL and token.
@@ -30,8 +28,7 @@ func NewApplicationClient() (*ApplicationClient, error) {
 	}
 
 	return &ApplicationClient{
-		httpClient: resty.New().SetBaseURL(client.ServerURL()),
-		client:     client,
+		client: client,
 	}, nil
 }
 
@@ -49,8 +46,7 @@ func NewApplicationClient() (*ApplicationClient, error) {
 //	})
 func (c *ApplicationClient) ListApplications(params *ListApplicationsParams) (*types.ApplicationListResponse, error) {
 	var result types.ApplicationListResponse
-	req := c.httpClient.R().
-		SetHeader("Authorization", "Bearer "+c.client.AccessToken()).
+	req := c.client.HTTPClient().R().
 		SetResult(&result)
 
 	if params != nil {
@@ -84,8 +80,7 @@ func (c *ApplicationClient) ListApplications(params *ListApplicationsParams) (*t
 // It returns details about pods, containers, and their health status.
 func (c *ApplicationClient) GetApplicationPS(id string) (*types.ApplicationPSResponse, error) {
 	var result types.ApplicationPSResponse
-	resp, err := c.httpClient.R().
-		SetHeader("Authorization", "Bearer "+c.client.AccessToken()).
+	resp, err := c.client.HTTPClient().R().
 		SetResult(&result).
 		Get(fmt.Sprintf(getApplicationPSRoute, id))
 	if err != nil {
@@ -110,8 +105,7 @@ func (c *ApplicationClient) GetApplicationPS(id string) (*types.ApplicationPSRes
 //	    KeepData: true,
 //	})
 func (c *ApplicationClient) DeleteApplication(id string, params *DeleteApplicationParams) error {
-	req := c.httpClient.R().
-		SetHeader("Authorization", "Bearer "+c.client.AccessToken())
+	req := c.client.HTTPClient().R()
 
 	if params != nil {
 		if params.KeepData {
@@ -134,8 +128,7 @@ func (c *ApplicationClient) DeleteApplication(id string, params *DeleteApplicati
 // GetApplication retrieves full details for a specific application by ID.
 func (c *ApplicationClient) GetApplication(id string) (*types.Application, error) {
 	var result types.Application
-	resp, err := c.httpClient.R().
-		SetHeader("Authorization", "Bearer "+c.client.AccessToken()).
+	resp, err := c.client.HTTPClient().R().
 		SetResult(&result).
 		Get(fmt.Sprintf(getApplicationRoute, id))
 	if err != nil {
