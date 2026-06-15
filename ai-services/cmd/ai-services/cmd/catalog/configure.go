@@ -8,13 +8,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/cli/configure"
+	catalogPodman "github.com/project-ai-services/ai-services/internal/pkg/catalog/cli/configure/podman"
 	"github.com/project-ai-services/ai-services/internal/pkg/constants"
 	"github.com/project-ai-services/ai-services/internal/pkg/logger"
 	"github.com/project-ai-services/ai-services/internal/pkg/runtime"
 	"github.com/project-ai-services/ai-services/internal/pkg/runtime/types"
 	"github.com/project-ai-services/ai-services/internal/pkg/utils"
 	"github.com/project-ai-services/ai-services/internal/pkg/vars"
-	catalogPodman "github.com/project-ai-services/ai-services/internal/pkg/catalog/cli/configure/podman"
 )
 
 var (
@@ -111,8 +111,8 @@ func runConfigure() error {
 }
 
 func validateResetFlags(cmd *cobra.Command) error {
-	if !resetPasswordFlag {
-		return nil
+	if err := validateRuntimeFlag(); err != nil {
+		return err
 	}
 
 	// Check if domain-name was explicitly set
@@ -135,6 +135,24 @@ func validateResetFlags(cmd *cobra.Command) error {
 
 // validateConfigureFlags validates the configure command flags and initializes runtime.
 func validateConfigureFlags() error {
+	if err := validateRuntimeFlag(); err != nil {
+		return err
+	}
+
+	// Validate SSL flags
+	if err := validateSSLFlags(); err != nil {
+		return err
+	}
+
+	// Validate HTTPS port range
+	if httpsPort < 1 || httpsPort > 65535 {
+		return fmt.Errorf("invalid HTTPS port %d: must be between 1 and 65535", httpsPort)
+	}
+
+	return nil
+}
+
+func validateRuntimeFlag() error {
 	// Initialize runtime factory based on flag
 	rt := types.RuntimeType(runtimeType)
 	if !rt.Valid() {
@@ -147,16 +165,6 @@ func validateConfigureFlags() error {
 	// Check if podman runtime is being used on unsupported platform
 	if err := utils.CheckPodmanPlatformSupport(vars.RuntimeFactory.GetRuntimeType()); err != nil {
 		return err
-	}
-
-	// Validate SSL flags
-	if err := validateSSLFlags(); err != nil {
-		return err
-	}
-
-	// Validate HTTPS port range
-	if httpsPort < 1 || httpsPort > 65535 {
-		return fmt.Errorf("invalid HTTPS port %d: must be between 1 and 65535", httpsPort)
 	}
 
 	return nil
@@ -293,6 +301,5 @@ func runResetPassword() error {
 
 	return catalogPodman.ResetCatalogPassword()
 }
-
 
 // Made with Bob

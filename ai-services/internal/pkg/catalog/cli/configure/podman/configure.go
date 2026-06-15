@@ -35,7 +35,7 @@ func DeployCatalog(ctx context.Context, opts PodmanConfigureOptions) error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Load SSL certificates if provided
 	if err := caddyCtx.LoadSSLCertificates(opts.BaseDir, opts.SSLCertPath, opts.SSLKeyPath); err != nil {
 		return err
@@ -107,7 +107,6 @@ func ExecuteCatalogDeployment(ctx context.Context, opts PodmanConfigureOptions) 
 
 	return deployCtx, caddyCtx, nil
 }
-
 
 // handlePostDeployment handles route registration and next steps display after catalog deployment.
 func handlePostDeployment(caddyCtx *caddy.Context, deployCtx *deploy.DeployContext) error {

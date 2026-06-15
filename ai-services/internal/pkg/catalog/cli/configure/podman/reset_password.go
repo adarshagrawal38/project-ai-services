@@ -96,7 +96,7 @@ func processCatalogPod(rt runtime.Runtime) (map[string]string, error) {
 		return podEnv, fmt.Errorf("failed to delete existing catalog pod: %w", err)
 	}
 
-	return podEnv, fmt.Errorf("failed to find catalog container in pod %s", pod.Name)
+	return podEnv, nil
 }
 
 func getFlagValues(podEnv map[string]string) (string, string, int) {
