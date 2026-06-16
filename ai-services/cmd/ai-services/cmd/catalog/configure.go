@@ -134,12 +134,12 @@ func validateResetAuthFlags(cmd *cobra.Command) error {
 }
 
 func validateResetFlag(cmd *cobra.Command, flagName string) error {
-	// Check that no configuration parameters are provided with --reset-password
-	// List of flags that cannot be used with --reset-password
+	// Check that no configuration parameters are provided with reset flag
+	// List of flags that cannot be used with reset flag
 	var invalidFlags []string
 	cmd.Flags().Visit(func(f *pflag.Flag) {
 		if f.Name == flagName || f.Name == "runtime" {
-			// Skip valid flags
+			// Skip reset flag and runtime parameter
 			return
 		}
 		invalidFlags = append(invalidFlags, "--"+f.Name)
