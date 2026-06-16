@@ -109,7 +109,6 @@ func printServicesInfo(services []catalogTypes.ApplicationService, appPS *catalo
 
 	for _, service := range services {
 		params := map[string]string{}
-		params["STATUS"] = strings.ToLower(service.Status)
 		params["SERVICE_NAME"] = service.Type
 
 		uiStatus, apiSatatus := getContainerStatus(appPS.Services, service.CatalogID)
@@ -145,7 +144,13 @@ func getContainerStatus(services []catalogTypes.Pod, catalogID string) (string, 
 		if strings.HasPrefix(servicePod.PodName, catalogID) {
 			for _, podContainer := range servicePod.Containers {
 				uiContainerName := fmt.Sprintf("%s-ui", servicePod.PodName)
-				apiContainerName := fmt.Sprintf("%s-backend-server", servicePod.PodName)
+				apiContainerName := ""
+				if strings.Contains(podContainer.Name, "backend-server") {
+					apiContainerName = podContainer.Name
+				} else {
+					apiContainerName = fmt.Sprintf("%s-%s-api", servicePod.PodName, catalogID)
+				}
+
 				if podContainer.Name == uiContainerName && podContainer.Healthy {
 					uiStatus = "running"
 				}
