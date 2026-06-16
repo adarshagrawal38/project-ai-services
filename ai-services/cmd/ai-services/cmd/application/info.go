@@ -4,15 +4,15 @@ import (
 	"bytes"
 	"fmt"
 	"strings"
+	"text/template"
 
 	"github.com/spf13/cobra"
 
-	"github.com/project-ai-services/ai-services/assets"
 	"github.com/project-ai-services/ai-services/internal/pkg/application"
 	appTypes "github.com/project-ai-services/ai-services/internal/pkg/application/types"
+	"github.com/project-ai-services/ai-services/internal/pkg/catalog"
 	catalogClient "github.com/project-ai-services/ai-services/internal/pkg/catalog/client"
 	catalogTypes "github.com/project-ai-services/ai-services/internal/pkg/catalog/types"
-	"github.com/project-ai-services/ai-services/internal/pkg/cli/templates"
 	cliUtils "github.com/project-ai-services/ai-services/internal/pkg/cli/utils"
 	"github.com/project-ai-services/ai-services/internal/pkg/logger"
 	"github.com/project-ai-services/ai-services/internal/pkg/runtime/types"
@@ -98,7 +98,10 @@ func renderApplicationInfo(appName string) error {
 }
 
 func printServicesInfo(services []catalogTypes.ApplicationService, appPS *catalogTypes.ApplicationPSResponse) error {
-	tp := templates.NewEmbedTemplateProvider(&assets.ServicesFS)
+	catalogProvider, err := catalog.NewCatalogProvider()
+	if err != nil {
+		return fmt.Errorf("failed to create catalog provider: %w", err)
+	}
 
 	logger.Infoln("Info:")
 	logger.Infoln("-------")
@@ -121,7 +124,12 @@ func printServicesInfo(services []catalogTypes.ApplicationService, appPS *catalo
 			}
 		}
 
-		err := printInfo(tp, params, service.CatalogID)
+		tmpls, err := catalogProvider.LoadServicesReadme(service.CatalogID)
+		if err != nil {
+			return fmt.Errorf("failed to load service readme: %w", err)
+		}
+
+		err = printInfo(tmpls, params, service.CatalogID)
 		if err != nil {
 			return fmt.Errorf("failed to load application info: %w", err)
 		}
@@ -151,13 +159,7 @@ func getContainerStatus(services []catalogTypes.Pod, catalogID string) (string, 
 	return uiStatus, apiStatus
 }
 
-func printInfo(tp templates.Template, params map[string]string, appTemplate string) error {
-	tmpls, err := tp.LoadMdFiles(appTemplate)
-	if err != nil {
-		logger.Warningf("failed to load templates: %v", err)
-
-		return nil
-	}
+func printInfo(tmpls map[string]*template.Template, params map[string]string, appTemplate string) error {
 	tmpl, ok := tmpls["info.md"]
 	if !ok {
 		logger.Warningf("failed to find info.md template")

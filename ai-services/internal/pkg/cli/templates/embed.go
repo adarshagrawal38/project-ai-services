@@ -60,8 +60,6 @@ func NewEmbedTemplateProvider(fs *embed.FS, root ...string) Template {
 			rootPath = "bootstrap"
 		case &assets.CatalogFS:
 			rootPath = "catalog"
-		case &assets.ServicesFS:
-			rootPath = "services"
 		default:
 			rootPath = "applications"
 		}
@@ -312,6 +310,8 @@ func (e *embedTemplateProvider) LoadMetadata(app string, isRuntime bool, target 
 func (e *embedTemplateProvider) LoadMdFiles(app string) (map[string]*template.Template, error) {
 	tmpls := make(map[string]*template.Template)
 	completePath := e.buildPath(app, getRuntime(), "steps")
+	fmt.Println("completePath: %w", completePath)
+	
 	err := fs.WalkDir(e.fs, completePath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
