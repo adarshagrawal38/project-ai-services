@@ -122,27 +122,7 @@ func validateResetPasswordFlags(cmd *cobra.Command) error {
 		return err
 	}
 
-	// Check if basedir was explicitly setn
-	if baseDir != "" {
-		return fmt.Errorf("--base-dir cannot be used with --reset-password")
-	}
-
-	// Check if domain-name was explicitly set
-	if domainName != "" {
-		return fmt.Errorf("--domain-name cannot be used with --reset-password")
-	}
-
-	// Check if https-port was explicitly set by the user
-	if cmd.Flags().Changed("https-port") {
-		return fmt.Errorf("--https-port cannot be used with --reset-password")
-	}
-
-	// Check if SSL certificate flags were set
-	if sslCertPath != "" || sslKeyPath != "" {
-		return fmt.Errorf("--ssl-cert and --ssl-key cannot be used with --reset-password")
-	}
-
-	return nil
+	return validateResetFlag(cmd, "reset-password")
 }
 
 func validateResetAuthFlags(cmd *cobra.Command) error {
