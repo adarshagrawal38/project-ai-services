@@ -11,6 +11,7 @@ import (
 	"github.com/project-ai-services/ai-services/internal/pkg/application"
 	appTypes "github.com/project-ai-services/ai-services/internal/pkg/application/types"
 	catalogClient "github.com/project-ai-services/ai-services/internal/pkg/catalog/client"
+	catalogTypes "github.com/project-ai-services/ai-services/internal/pkg/catalog/types"
 	"github.com/project-ai-services/ai-services/internal/pkg/cli/templates"
 	cliUtils "github.com/project-ai-services/ai-services/internal/pkg/cli/utils"
 	"github.com/project-ai-services/ai-services/internal/pkg/logger"
@@ -84,20 +85,33 @@ func renderApplicationInfo(appName string) error {
 		return fmt.Errorf("failed to get application: %w", err)
 	}
 
+	appPS, err := appClient.GetApplicationPS(app.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get application pods: %w", err)
+	}
+
 	logger.Infoln("Application Name: " + application.Name)
 	logger.Infoln("Application Template: " + application.CatalogID)
 	logger.Infof("Application Version: " + application.Version)
 
+	return printServicesInfo(application.Services, appPS)
+}
+
+func printServicesInfo(services []catalogTypes.ApplicationService, appPS *catalogTypes.ApplicationPSResponse) error {
 	tp := templates.NewEmbedTemplateProvider(&assets.ServicesFS)
 
 	logger.Infoln("Info:")
 	logger.Infoln("-------")
 	logger.Infoln("Day N: ")
 
-	for _, service := range application.Services {
+	for _, service := range services {
 		params := map[string]string{}
 		params["STATUS"] = strings.ToLower(service.Status)
 		params["SERVICE_NAME"] = service.Type
+
+		uiStatus, apiSatatus := getContainerStatus(appPS.Services, service.CatalogID)
+		params["UI_STATUS"] = uiStatus
+		params["API_STATUS"] = apiSatatus
 
 		for _, endpoint := range service.Endpoints {
 			urlType, urlTypeOk := endpoint["type"].(string)
@@ -107,13 +121,34 @@ func renderApplicationInfo(appName string) error {
 			}
 		}
 
-		err = printInfo(tp, params, service.CatalogID)
+		err := printInfo(tp, params, service.CatalogID)
 		if err != nil {
 			return fmt.Errorf("failed to load application info: %w", err)
 		}
 	}
-
+	
 	return nil
+}
+
+func getContainerStatus(services []catalogTypes.Pod, catalogID string) (string, string) {
+	uiStatus, apiStatus := "", ""
+
+	for _, servicePod := range services {
+		if strings.HasPrefix(servicePod.PodName, catalogID) {
+			for _, podContainer := range servicePod.Containers {
+				uiContainerName := fmt.Sprintf("%s-ui", servicePod.PodName)
+				apiContainerName := fmt.Sprintf("%s-backend-server", servicePod.PodName)
+				if podContainer.Name == uiContainerName && podContainer.Healthy {
+					uiStatus = "running"
+				}
+				if podContainer.Name == apiContainerName && podContainer.Healthy {
+					apiStatus = "running"
+				}
+			}
+		}
+	}
+
+	return uiStatus, apiStatus
 }
 
 func printInfo(tp templates.Template, params map[string]string, appTemplate string) error {

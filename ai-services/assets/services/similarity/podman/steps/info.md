@@ -1,7 +1,7 @@
 Day N:
 
 {{- if ne .API_URL "" }}
-{{- if eq .STATUS "running" }}
+{{- if eq .API_STATUS "running" }}
 
 - {{ .SERVICE_NAME }} Search API is available to use at {{ .API_URL }}
 {{- else }}

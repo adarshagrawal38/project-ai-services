@@ -1,7 +1,7 @@
 Day N:
 
 {{- if ne .UI_URL "" }}
-{{- if eq .STATUS "running" }}
+{{- if eq .UI_STATUS "running" }}
 
 - {{ .SERVICE_NAME }} is available to use at {{ .UI_URL }}.
 {{- else }}
@@ -11,7 +11,7 @@ Day N:
 {{- end }}
 
 {{- if ne .API_URL "" }}
-{{- if eq .STATUS "running" }}
+{{- if eq .API_STATUS "running" }}
 
 - {{ .SERVICE_NAME }} API is available to use at {{ .API_URL }}.
 {{- else }}

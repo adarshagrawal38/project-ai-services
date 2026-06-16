@@ -1,6 +1,6 @@
 Day N:
 
-{{- if eq .STATUS "running" }}
+{{- if eq .API_STATUS "running" }}
 
 - {{ .SERVICE_NAME }} API is available to use at {{ .API_URL }}. Use this endpoint for document summarization via programmatic access.
 {{- else }}

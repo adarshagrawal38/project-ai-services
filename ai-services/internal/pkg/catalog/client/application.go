@@ -41,8 +41,6 @@ func NewApplicationClient() (*ApplicationClient, error) {
 		return nil, fmt.Errorf("failed to initialize client: %w", err)
 	}
 
-	httpClient := resty.New().SetBaseURL(client.ServerURL())
-
 	return &ApplicationClient{
 		client: client,
 	}, nil
