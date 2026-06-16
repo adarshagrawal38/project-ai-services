@@ -123,7 +123,7 @@ func printServicesInfo(services []catalogTypes.ApplicationService, appPS *catalo
 			}
 		}
 
-		tmpls, err := catalogProvider.LoadServicesReadme(service.CatalogID)
+		tmpls, err := catalogProvider.LoadServicesMD(service.CatalogID)
 		if err != nil {
 			return fmt.Errorf("failed to load service readme: %w", err)
 		}
@@ -143,6 +143,7 @@ func getContainerStatus(services []catalogTypes.Pod, catalogID string) (string, 
 	for _, servicePod := range services {
 		if strings.HasPrefix(servicePod.PodName, catalogID) {
 			for _, podContainer := range servicePod.Containers {
+				// TODO: Update container status in info.md generically
 				uiContainerName := fmt.Sprintf("%s-ui", servicePod.PodName)
 				apiContainerName := ""
 				if strings.Contains(podContainer.Name, "backend-server") {

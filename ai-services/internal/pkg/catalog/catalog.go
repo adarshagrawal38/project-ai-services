@@ -785,9 +785,9 @@ func (p *CatalogProvider) LoadServiceTemplates(serviceID string) (map[string]*te
 	return templates, nil
 }
 
-// LoadServicesReadme loads all readme for a service.
+// LoadServicesMD loads all steps md files for a service.
 // Returns a map of template name to parsed template.
-func (p *CatalogProvider) LoadServicesReadme(serviceID string) (map[string]*texttemplate.Template, error) {
+func (p *CatalogProvider) LoadServicesMD(serviceID string) (map[string]*texttemplate.Template, error) {
 	// Get service path from catalog
 	servicePath, err := p.GetCatalogItemPath(serviceID)
 	if err != nil {
