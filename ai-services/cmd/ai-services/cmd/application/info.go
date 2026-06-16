@@ -126,7 +126,7 @@ func printServicesInfo(services []catalogTypes.ApplicationService, appPS *catalo
 			return fmt.Errorf("failed to load application info: %w", err)
 		}
 	}
-	
+
 	return nil
 }
 
