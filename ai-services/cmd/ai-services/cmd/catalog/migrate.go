@@ -15,13 +15,12 @@ import (
 // NewMigrateCmd returns the cobra command for database migration operations.
 func NewMigrateCmd() *cobra.Command {
 	var (
-		dbHost      string
-		dbPort      int
-		dbUser      string
-		dbPassword  string
-		dbName      string
-		dbSSLMode   string
-		runtimeType string
+		dbHost     string
+		dbPort     int
+		dbUser     string
+		dbPassword string
+		dbName     string
+		dbSSLMode  string
 	)
 
 	migrateCmd := &cobra.Command{
@@ -30,9 +29,6 @@ func NewMigrateCmd() *cobra.Command {
 		Long: `Manage database migrations for the catalog service.
 This command provides subcommands to initialize the database, run migrations,
 check migration status, and rollback migrations.`,
-		PreRunE: func(cmd *cobra.Command, args []string) error {
-			return common.InitAndValidateRuntimeFlag(runtimeType)
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
 		},
@@ -45,9 +41,7 @@ check migration status, and rollback migrations.`,
 	migrateCmd.PersistentFlags().StringVar(&dbPassword, "db-password", "", "Database password")
 	migrateCmd.PersistentFlags().StringVar(&dbName, "db-name", constants.DefaultDBName, "Database name")
 	migrateCmd.PersistentFlags().StringVar(&dbSSLMode, "db-sslmode", constants.DefaultSSLMode, "Database SSL mode (disable, require, verify-ca, verify-full)")
-	common.ConfigureRuntimeFlag(migrateCmd, &runtimeType)
 
-	// Helper function to get database config from flags
 	getDBConfig := func() db.Config {
 		// Check for environment variables if password not provided
 		password := dbPassword
@@ -91,11 +85,16 @@ check migration status, and rollback migrations.`,
 
 // createInitCmd creates the init subcommand.
 func createInitCmd(getDBConfig func() db.Config) *cobra.Command {
-	return &cobra.Command{
+	var runtimeType string
+
+	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize the database and run all migrations",
 		Long: `Initialize the catalog database by creating it if it doesn't exist
 and running all pending migrations.`,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return common.InitAndValidateRuntimeFlag(runtimeType)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := getDBConfig()
 
@@ -128,14 +127,23 @@ and running all pending migrations.`,
 			return nil
 		},
 	}
+
+	common.ConfigureRuntimeFlag(cmd, &runtimeType)
+
+	return cmd
 }
 
 // createUpCmd creates the up subcommand.
 func createUpCmd(getDBConfig func() db.Config) *cobra.Command {
-	return &cobra.Command{
+	var runtimeType string
+
+	cmd := &cobra.Command{
 		Use:   "up",
 		Short: "Run all pending migrations",
 		Long:  `Run all pending database migrations.`,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return common.InitAndValidateRuntimeFlag(runtimeType)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := getDBConfig()
 
@@ -162,14 +170,23 @@ func createUpCmd(getDBConfig func() db.Config) *cobra.Command {
 			return nil
 		},
 	}
+
+	common.ConfigureRuntimeFlag(cmd, &runtimeType)
+
+	return cmd
 }
 
 // createStatusCmd creates the status subcommand.
 func createStatusCmd(getDBConfig func() db.Config) *cobra.Command {
-	return &cobra.Command{
+	var runtimeType string
+
+	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Check the status of database migrations",
 		Long:  `Display the current status of all database migrations.`,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return common.InitAndValidateRuntimeFlag(runtimeType)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := getDBConfig()
 
@@ -195,14 +212,23 @@ func createStatusCmd(getDBConfig func() db.Config) *cobra.Command {
 			return nil
 		},
 	}
+
+	common.ConfigureRuntimeFlag(cmd, &runtimeType)
+
+	return cmd
 }
 
 // createDownCmd creates the down subcommand.
 func createDownCmd(getDBConfig func() db.Config) *cobra.Command {
-	return &cobra.Command{
+	var runtimeType string
+
+	cmd := &cobra.Command{
 		Use:   "down",
 		Short: "Rollback the most recent migration",
 		Long:  `Rollback the most recently applied database migration.`,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			return common.InitAndValidateRuntimeFlag(runtimeType)
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg := getDBConfig()
 
@@ -229,6 +255,10 @@ func createDownCmd(getDBConfig func() db.Config) *cobra.Command {
 			return nil
 		},
 	}
+
+	common.ConfigureRuntimeFlag(cmd, &runtimeType)
+
+	return cmd
 }
 
 // Made with Bob

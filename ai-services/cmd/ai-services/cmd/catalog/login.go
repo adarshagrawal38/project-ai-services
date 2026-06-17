@@ -54,7 +54,7 @@ Examples:
 			if err := common.InitAndValidateRuntimeFlag(runtimeType); err != nil {
 				return err
 			}
-			
+
 			return validateServerURL(serverURL)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {

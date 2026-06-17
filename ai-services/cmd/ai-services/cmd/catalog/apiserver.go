@@ -153,6 +153,6 @@ func NewAPIServerCmd() *cobra.Command {
 	apiserverCmd.Flags().StringVar(&adminUserName, "admin-username", "admin", "Username for the default admin user")
 	apiserverCmd.Flags().StringVar(&adminPasswordHash, "admin-password-hash", "", "Precomputed hash of the password for the default admin user")
 	common.ConfigureRuntimeFlag(apiserverCmd, &runtimeType)
-	
+
 	return apiserverCmd
 }
