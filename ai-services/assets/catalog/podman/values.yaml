@@ -28,3 +28,5 @@ caddy:
   adminPort: ""
   # @description HTTPS port for caddy. Set by configure command via --https-port flag.
   httpsPort: ""
+
+runtime: "podman"
