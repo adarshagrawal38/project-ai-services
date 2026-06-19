@@ -86,7 +86,10 @@ COMPONENTS = {
     ],
     "images/caddy/Makefile": [
         ("ai-services/assets/catalog/podman/values.yaml", "caddy"),
-    ]
+    ],
+    "images/tools/Makefile": [
+        ("ai-services/internal/pkg/vars/var.go", "ToolImage"),
+    ],
 }
 
 
@@ -213,6 +216,52 @@ def update_image_in_values_yaml(values_path: Path, key: str, registry: str, imag
     return True
 
 
+def update_image_in_go_file(go_file_path: Path, var_name: str, registry: str, image_name: str, tag: str) -> bool:
+    """
+    Update the image reference in a Go file for a specific variable.
+    
+    Example: ToolImage = "icr.io/ai-services-cicd/tools:0.10"
+    
+    Returns True if the file was modified, False otherwise.
+    """
+    content = go_file_path.read_text()
+    new_image = f"{registry}/{image_name}:{tag}"
+    
+    # Pattern to match Go variable assignment: VarName = "image:tag"
+    pattern = re.compile(
+        rf'({var_name}\s*=\s*)"([^"]+)"',
+        re.MULTILINE,
+    )
+    
+    match = pattern.search(content)
+    if not match:
+        print(f"  ⚠️  Could not find '{var_name}' variable in {go_file_path}")
+        return False
+    
+    old_image = match.group(2)
+    
+    # Skip if it's a third-party image (not from our registry)
+    if not old_image.startswith(registry + "/"):
+        print(f"  ⏭️  Skipping third-party image for '{var_name}': {old_image}")
+        return False
+    
+    # Check if update is needed
+    if old_image == new_image:
+        print(f"  ✅ Already up-to-date: {go_file_path} [{var_name}]")
+        return False
+    
+    # Replace the image
+    new_content = pattern.sub(rf'\1"{new_image}"', content)
+    
+    # Write back to file
+    go_file_path.write_text(new_content)
+    print(f"  ✅ Updated: {go_file_path} [{var_name}]")
+    print(f"     Old: {old_image}")
+    print(f"     New: {new_image}")
+    
+    return True
+
+
 def process_makefile(makefile_rel: str, registry: str, repo_root: Path, dry_run: bool) -> Tuple[int, int, int]:
     """
     Process a single Makefile and update its corresponding values.yaml files.
@@ -254,36 +303,68 @@ def process_makefile(makefile_rel: str, registry: str, repo_root: Path, dry_run:
             error_count += 1
             continue
         
+        # Check if this is a Go file (special case for tools image)
+        is_go_file = values_path.suffix == '.go'
+        
         if dry_run:
             # In dry-run mode, just show what would be updated
             try:
                 content = values_path.read_text()
-                pattern = re.compile(
-                    rf"^{values_key}:\s*\n(?:.*?\n)*?  image:\s*(\S+)",
-                    re.MULTILINE,
-                )
-                match = pattern.search(content)
-                if match:
-                    old_image = match.group(1)
-                    new_image = f"{registry}/{image_name}:{tag}"
-                    if old_image != new_image:
-                        print(f"  🔍 Would update: {values_rel} [{values_key}]")
-                        print(f"     Old: {old_image}")
-                        print(f"     New: {new_image}")
-                        updated_count += 1
-                    else:
-                        print(f"  ✅ Already up-to-date: {values_rel} [{values_key}]")
-                        skipped_count += 1
+                
+                if is_go_file:
+                    # Handle Go file
+                    pattern = re.compile(
+                        rf'{values_key}\s*=\s*"([^"]+)"',
+                        re.MULTILINE,
+                    )
+                    match = pattern.search(content)
+                    if match:
+                        old_image = match.group(1)
+                        new_image = f"{registry}/{image_name}:{tag}"
+                        if old_image != new_image:
+                            print(f"  🔍 Would update: {values_rel} [{values_key}]")
+                            print(f"     Old: {old_image}")
+                            print(f"     New: {new_image}")
+                            updated_count += 1
+                        else:
+                            print(f"  ✅ Already up-to-date: {values_rel} [{values_key}]")
+                            skipped_count += 1
+                else:
+                    # Handle YAML file
+                    pattern = re.compile(
+                        rf"^{values_key}:\s*\n(?:.*?\n)*?  image:\s*(\S+)",
+                        re.MULTILINE,
+                    )
+                    match = pattern.search(content)
+                    if match:
+                        old_image = match.group(1)
+                        new_image = f"{registry}/{image_name}:{tag}"
+                        if old_image != new_image:
+                            print(f"  🔍 Would update: {values_rel} [{values_key}]")
+                            print(f"     Old: {old_image}")
+                            print(f"     New: {new_image}")
+                            updated_count += 1
+                        else:
+                            print(f"  ✅ Already up-to-date: {values_rel} [{values_key}]")
+                            skipped_count += 1
             except Exception as e:
                 print(f"  ❌ Error reading {values_rel}: {e}")
                 error_count += 1
         else:
             # Actually update the file
             try:
-                if update_image_in_values_yaml(values_path, values_key, registry, image_name, tag):
-                    updated_count += 1
+                if is_go_file:
+                    # Update Go file
+                    if update_image_in_go_file(values_path, values_key, registry, image_name, tag):
+                        updated_count += 1
+                    else:
+                        skipped_count += 1
                 else:
-                    skipped_count += 1
+                    # Update YAML file
+                    if update_image_in_values_yaml(values_path, values_key, registry, image_name, tag):
+                        updated_count += 1
+                    else:
+                        skipped_count += 1
             except Exception as e:
                 print(f"  ❌ Error updating {values_rel}: {e}")
                 error_count += 1
