@@ -45,7 +45,12 @@ func NewConfigureCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "configure",
 		Short: "Configure the catalog service",
-		Long: `Configures the catalog service with the provided configuration.
+		Long: `Configures the catalog service for the specified runtime type.
+
+The catalog service manages AI services through two main components:
+	- Catalog UI: Web-based interface for managing AI services
+	- Catalog API: REST API for programmatic management of AI services
+
 
 Examples:
 	 # Configure catalog service for podman
