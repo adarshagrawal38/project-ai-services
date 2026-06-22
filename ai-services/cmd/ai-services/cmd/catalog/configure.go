@@ -44,8 +44,8 @@ const (
 func NewConfigureCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "configure",
-		Short: "Configure the catalog service with initial configuration",
-		Long: `Deploys the catalog service with the provided configuration.
+		Short: "Configure the catalog service",
+		Long: `Configures the catalog service with the provided configuration.
 
 Examples:
 	 # Configure catalog service for podman
