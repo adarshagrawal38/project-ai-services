@@ -37,6 +37,13 @@ func NewApplicationValidator(provider *catalog.CatalogProvider) *ApplicationVali
 
 // ValidateDeploymentRequest validates the entire deployment request.
 func (v *ApplicationValidator) ValidateDeploymentRequest(ctx context.Context, req apimodels.CreateApplicationRequest) error {
+	// Validate app name
+	if err := v.ValidateAppName(req.Name); err != nil {
+		return &ValidationError{
+			Code:    http.StatusBadRequest,
+			Message: err.Error(),
+		}
+	}
 	// Validate based on deployment type
 	if v.provider.ArchitectureExists(req.CatalogID) {
 		return v.ValidateArchitectureDeployment(ctx, req)
@@ -48,6 +55,44 @@ func (v *ApplicationValidator) ValidateDeploymentRequest(ctx context.Context, re
 			Message: fmt.Sprintf("Catalog ID '%s' not found as architecture or service", req.CatalogID),
 		}
 	}
+}
+
+func (v *ApplicationValidator) ValidateAppName(appName string) error {
+	// Check if app name is empty
+	if appName == "" {
+		return fmt.Errorf("application name cannot be empty")
+	}
+
+	// Restrict max character length to 64
+	if len(appName) > 64 {
+		return fmt.Errorf("application name exceeds maximum length of 64 characters (current: %d)", len(appName))
+	}
+
+	// Start and end should be alphabet/number only
+	firstChar := rune(appName[0])
+	lastChar := rune(appName[len(appName)-1])
+	
+	if !isAlphanumeric(firstChar) {
+		return fmt.Errorf("application name must start with an alphanumeric character (a-z, A-Z, 0-9)")
+	}
+	
+	if !isAlphanumeric(lastChar) {
+		return fmt.Errorf("application name must end with an alphanumeric character (a-z, A-Z, 0-9)")
+	}
+
+	// App name should not contain special chars other than hyphen and underscore
+	for i, char := range appName {
+		if !isAlphanumeric(char) && char != '-' && char != '_' {
+			return fmt.Errorf("application name contains invalid character '%c' at position %d. Only alphanumeric characters, hyphens (-), and underscores (_) are allowed", char, i+1)
+		}
+	}
+
+	return nil
+}
+
+// isAlphanumeric checks if a character is alphanumeric (a-z, A-Z, 0-9).
+func isAlphanumeric(char rune) bool {
+	return (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9')
 }
 
 // ValidateArchitectureDeployment validates an architecture deployment request.
