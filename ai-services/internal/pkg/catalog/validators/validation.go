@@ -65,6 +65,11 @@ func (v *ApplicationValidator) ValidateAppName(appName string) error {
 	}
 
 	// Restrict character length between 4 and 64
+	const minAppNameLength = 4
+	const maxAppNameLength = 64
+	if len(appName) < minAppNameLength || len(appName) > maxAppNameLength {
+		return fmt.Errorf("application name must be between %d and %d characters (current: %d)", minAppNameLength, maxAppNameLength, len(appName))
+	}
 	if len(appName) < 4 || len(appName) > 64 {
 		return fmt.Errorf("application name must be between 4 and 64 characters (current: %d)", len(appName))
 	}
