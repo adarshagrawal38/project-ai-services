@@ -57,6 +57,11 @@ func (v *ApplicationValidator) ValidateDeploymentRequest(ctx context.Context, re
 	}
 }
 
+// appNameRegex validates application name format:
+// - Must start and end with alphanumeric character
+// - Can contain alphanumeric, hyphens, and underscores in between
+var appNameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*[a-zA-Z0-9]$`)
+
 // ValidateAppName validates the application name.
 func (v *ApplicationValidator) ValidateAppName(appName string) error {
 	// Check if app name is empty
@@ -71,28 +76,14 @@ func (v *ApplicationValidator) ValidateAppName(appName string) error {
 		return fmt.Errorf("application name must be between %d and %d characters (current: %d)", minAppNameLength, maxAppNameLength, len(appName))
 	}
 
-	// Start and end should be alphabet/number only
-	firstChar := rune(appName[0])
-	if !isAlphanumeric(firstChar) {
-		return fmt.Errorf("application name must start with an alphanumeric character (a-z, A-Z, 0-9)")
-	}
-
-	// App name should not contain special chars other than hyphen and underscore
-	for i, char := range appName {
-		if !isAlphanumeric(char) && char != '-' && char != '_' {
-			return fmt.Errorf("application name contains invalid character '%c' at position %d. Only alphanumeric characters, hyphens (-), and underscores (_) are allowed", char, i+1)
-		}
+	// Validate format: start/end with alphanumeric, allow hyphens and underscores in between
+	if !appNameRegex.MatchString(appName) {
+		return fmt.Errorf("application name must start and end with an alphanumeric character (a-z, A-Z, 0-9) and can only contain alphanumeric characters, hyphens (-), and underscores (_)")
 	}
 
 	return nil
 }
 
-// isAlphanumeric checks if a character is alphanumeric (a-z, A-Z, 0-9) using regex.
-func isAlphanumeric(char rune) bool {
-	var alphanumericRegex = regexp.MustCompile(`^[a-zA-Z0-9]$`)
-
-	return alphanumericRegex.MatchString(string(char))
-}
 
 // ValidateArchitectureDeployment validates an architecture deployment request.
 func (v *ApplicationValidator) ValidateArchitectureDeployment(ctx context.Context, req apimodels.CreateApplicationRequest) error {
