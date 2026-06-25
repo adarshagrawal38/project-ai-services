@@ -57,27 +57,22 @@ func (v *ApplicationValidator) ValidateDeploymentRequest(ctx context.Context, re
 	}
 }
 
+// ValidateAppName validates the application name.
 func (v *ApplicationValidator) ValidateAppName(appName string) error {
 	// Check if app name is empty
 	if appName == "" {
 		return fmt.Errorf("application name cannot be empty")
 	}
 
-	// Restrict max character length to 64
-	if len(appName) > 64 {
-		return fmt.Errorf("application name exceeds maximum length of 64 characters (current: %d)", len(appName))
+	// Restrict character length between 4 and 64
+	if len(appName) < 4 || len(appName) > 64 {
+		return fmt.Errorf("application name must be between 4 and 64 characters (current: %d)", len(appName))
 	}
 
 	// Start and end should be alphabet/number only
 	firstChar := rune(appName[0])
-	lastChar := rune(appName[len(appName)-1])
-	
 	if !isAlphanumeric(firstChar) {
 		return fmt.Errorf("application name must start with an alphanumeric character (a-z, A-Z, 0-9)")
-	}
-	
-	if !isAlphanumeric(lastChar) {
-		return fmt.Errorf("application name must end with an alphanumeric character (a-z, A-Z, 0-9)")
 	}
 
 	// App name should not contain special chars other than hyphen and underscore
@@ -90,9 +85,11 @@ func (v *ApplicationValidator) ValidateAppName(appName string) error {
 	return nil
 }
 
-// isAlphanumeric checks if a character is alphanumeric (a-z, A-Z, 0-9).
+// isAlphanumeric checks if a character is alphanumeric (a-z, A-Z, 0-9) using regex.
 func isAlphanumeric(char rune) bool {
-	return (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9')
+	var alphanumericRegex = regexp.MustCompile(`^[a-zA-Z0-9]$`)
+
+	return alphanumericRegex.MatchString(string(char))
 }
 
 // ValidateArchitectureDeployment validates an architecture deployment request.

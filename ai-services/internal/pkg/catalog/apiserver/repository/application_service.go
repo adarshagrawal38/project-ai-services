@@ -235,6 +235,13 @@ func (s *ApplicationService) UpdateApplication(ctx context.Context, id uuid.UUID
 			Message: ErrMsgUserNotOwner,
 		}
 	}
+	// Update app name by trimming prefix and suffix spaces
+	newName = strings.TrimSpace(newName)
+
+	if err := s.validator.ValidateAppName(newName); err != nil {
+		return nil, err
+	}
+
 	err = s.appRepo.UpdateDeploymentName(ctx, id, newName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update application name: %w", err)
