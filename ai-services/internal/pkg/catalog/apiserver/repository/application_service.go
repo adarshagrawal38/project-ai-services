@@ -235,8 +235,6 @@ func (s *ApplicationService) UpdateApplication(ctx context.Context, id uuid.UUID
 			Message: ErrMsgUserNotOwner,
 		}
 	}
-	// Update app name by trimming prefix and suffix spaces
-	newName = strings.TrimSpace(newName)
 
 	if err := s.validator.ValidateAppName(newName); err != nil {
 		return nil, err
@@ -286,6 +284,10 @@ func (s *ApplicationService) CreateApplication(ctx context.Context, req apimodel
 	req.Name = strings.TrimSpace(req.Name)
 
 	// Phase 2: Validate request payload
+	if err := s.validator.ValidateAppName(req.Name); err != nil {
+		return nil, err
+	}
+
 	if err := s.validator.ValidateDeploymentRequest(ctx, req); err != nil {
 		return nil, err
 	}

@@ -37,13 +37,6 @@ func NewApplicationValidator(provider *catalog.CatalogProvider) *ApplicationVali
 
 // ValidateDeploymentRequest validates the entire deployment request.
 func (v *ApplicationValidator) ValidateDeploymentRequest(ctx context.Context, req apimodels.CreateApplicationRequest) error {
-	// Validate app name
-	if err := v.ValidateAppName(req.Name); err != nil {
-		return &ValidationError{
-			Code:    http.StatusBadRequest,
-			Message: err.Error(),
-		}
-	}
 	// Validate based on deployment type
 	if v.provider.ArchitectureExists(req.CatalogID) {
 		return v.ValidateArchitectureDeployment(ctx, req)
@@ -57,33 +50,20 @@ func (v *ApplicationValidator) ValidateDeploymentRequest(ctx context.Context, re
 	}
 }
 
-// appNameRegex validates application name format:
-// - Must start and end with alphanumeric character
-// - Can contain alphanumeric, hyphens, and underscores in between
-var appNameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]*[a-zA-Z0-9]$`)
-
 // ValidateAppName validates the application name.
 func (v *ApplicationValidator) ValidateAppName(appName string) error {
-	// Check if app name is empty
-	if appName == "" {
-		return fmt.Errorf("application name cannot be empty")
-	}
-
 	// Restrict character length between 4 and 64
 	const minAppNameLength = 4
 	const maxAppNameLength = 64
 	if len(appName) < minAppNameLength || len(appName) > maxAppNameLength {
-		return fmt.Errorf("application name must be between %d and %d characters (current: %d)", minAppNameLength, maxAppNameLength, len(appName))
-	}
-
-	// Validate format: start/end with alphanumeric, allow hyphens and underscores in between
-	if !appNameRegex.MatchString(appName) {
-		return fmt.Errorf("application name must start and end with an alphanumeric character (a-z, A-Z, 0-9) and can only contain alphanumeric characters, hyphens (-), and underscores (_)")
+		return &ValidationError{
+			Code:    http.StatusBadRequest,
+			Message: fmt.Sprintf("application name must be between %d and %d characters", minAppNameLength, maxAppNameLength),
+		}
 	}
 
 	return nil
 }
-
 
 // ValidateArchitectureDeployment validates an architecture deployment request.
 func (v *ApplicationValidator) ValidateArchitectureDeployment(ctx context.Context, req apimodels.CreateApplicationRequest) error {
