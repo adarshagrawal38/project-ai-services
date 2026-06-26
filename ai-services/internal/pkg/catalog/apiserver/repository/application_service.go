@@ -280,9 +280,6 @@ func (s *ApplicationService) CreateApplication(ctx context.Context, req apimodel
 		}
 	}
 
-	// Update app name by trimming prefix and suffix spaces
-	req.Name = strings.TrimSpace(req.Name)
-
 	// Phase 2: Validate request payload
 	if err := s.validator.ValidateAppName(req.Name); err != nil {
 		return nil, err
