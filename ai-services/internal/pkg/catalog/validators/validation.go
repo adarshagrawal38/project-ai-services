@@ -50,21 +50,6 @@ func (v *ApplicationValidator) ValidateDeploymentRequest(ctx context.Context, re
 	}
 }
 
-// ValidateAppName validates the application name.
-func (v *ApplicationValidator) ValidateAppName(appName string) error {
-	// Restrict character length between 3 and 100
-	const minAppNameLength = 3
-	const maxAppNameLength = 100
-	if len(appName) < minAppNameLength || len(appName) > maxAppNameLength {
-		return &ValidationError{
-			Code:    http.StatusBadRequest,
-			Message: fmt.Sprintf("name must be between %d and %d characters", minAppNameLength, maxAppNameLength),
-		}
-	}
-
-	return nil
-}
-
 // ValidateArchitectureDeployment validates an architecture deployment request.
 func (v *ApplicationValidator) ValidateArchitectureDeployment(ctx context.Context, req apimodels.CreateApplicationRequest) error {
 	// Load architecture
