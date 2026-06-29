@@ -219,20 +219,8 @@ func ValidatePaginationParams(page, pageSize int) (int, int, error) {
 }
 
 func (s *ApplicationService) UpdateApplication(ctx context.Context, id uuid.UUID, userID, newName string) (*types.Application, error) {
-	if err := s.validator.ValidateAppName(newName); err != nil {
+	if err := s.validateApplicationName(ctx, newName); err != nil {
 		return nil, err
-	}
-
-	existingApp, err := s.appRepo.GetByName(ctx, newName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check for existing application: %w", err)
-	}
-	if existingApp != nil {
-		// Application with this name already exists - return conflict error
-		return nil, &ValidationError{
-			Code:    http.StatusConflict,
-			Message: fmt.Sprintf(ErrMsgApplicationNameExists, newName),
-		}
 	}
 
 	app, err := s.appRepo.GetByID(ctx, id)
@@ -280,20 +268,8 @@ func (s *ApplicationService) UpdateApplication(ctx context.Context, id uuid.UUID
 // for deployment execution, returning 202 Accepted immediately.
 func (s *ApplicationService) CreateApplication(ctx context.Context, req apimodels.CreateApplicationRequest) (*apimodels.CreateApplicationResponse, error) {
 	// Phase 1: Validate request and check for duplicate application name
-	if err := s.validator.ValidateAppName(req.Name); err != nil {
+	if err := s.validateApplicationName(ctx, req.Name); err != nil {
 		return nil, err
-	}
-
-	existingApp, err := s.appRepo.GetByName(ctx, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check for existing application: %w", err)
-	}
-	if existingApp != nil {
-		// Application with this name already exists - return conflict error
-		return nil, &ValidationError{
-			Code:    http.StatusConflict,
-			Message: fmt.Sprintf(ErrMsgApplicationNameExists, req.Name),
-		}
 	}
 
 	// Phase 2: Validate request payload
@@ -1219,6 +1195,27 @@ func loadApplicationPods(rt runtime.Runtime, appID string) ([]types.Pod, error) 
 
 	// Build pod response with metadata and container details
 	return appPodList, nil
+}
+
+// validateApplicationName validates the application name and checks if it already exists in DB.
+func (s *ApplicationService) validateApplicationName(ctx context.Context, appName string) error {
+	if err := s.validator.ValidateAppName(appName); err != nil {
+		return err
+	}
+
+	existingApp, err := s.appRepo.GetByName(ctx, appName)
+	if err != nil {
+		return fmt.Errorf("failed to check for existing application: %w", err)
+	}
+	if existingApp != nil {
+		// Application with this name already exists - return conflict error
+		return &ValidationError{
+			Code:    http.StatusConflict,
+			Message: fmt.Sprintf(ErrMsgApplicationNameExists, appName),
+		}
+	}
+
+	return nil
 }
 
 // Made with Bob

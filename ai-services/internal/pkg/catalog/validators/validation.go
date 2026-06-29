@@ -52,9 +52,9 @@ func (v *ApplicationValidator) ValidateDeploymentRequest(ctx context.Context, re
 
 // ValidateAppName validates the application name.
 func (v *ApplicationValidator) ValidateAppName(appName string) error {
-	// Restrict character length between 4 and 64
-	const minAppNameLength = 4
-	const maxAppNameLength = 64
+	// Restrict character length between 3 and 100
+	const minAppNameLength = 3
+	const maxAppNameLength = 100
 	if len(appName) < minAppNameLength || len(appName) > maxAppNameLength {
 		return &ValidationError{
 			Code:    http.StatusBadRequest,
