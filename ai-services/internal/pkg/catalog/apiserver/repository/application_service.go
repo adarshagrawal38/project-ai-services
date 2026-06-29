@@ -223,6 +223,18 @@ func (s *ApplicationService) UpdateApplication(ctx context.Context, id uuid.UUID
 		return nil, err
 	}
 
+	existingApp, err := s.appRepo.GetByName(ctx, newName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check for existing application: %w", err)
+	}
+	if existingApp != nil {
+		// Application with this name already exists - return conflict error
+		return nil, &ValidationError{
+			Code:    http.StatusConflict,
+			Message: fmt.Sprintf(ErrMsgApplicationNameExists, newName),
+		}
+	}
+
 	app, err := s.appRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get application: %w", err)
