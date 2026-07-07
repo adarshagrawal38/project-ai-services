@@ -12,146 +12,41 @@ import sys
 from pathlib import Path
 from typing import Optional, Tuple
 
-# Registry used in values.yaml files
-EXPECTED_REGISTRY = "icr.io/ai-services-cicd"
-
-# Map of: makefile_path -> list of (values_yaml_path, values_key)
-# values_key is the top-level key in values.yaml that contains the image reference
-COMPONENTS = {
-    "services/chatbot/Makefile": [
-        ("ai-services/assets/applications/rag/podman/values.yaml", "backend"),
-        ("ai-services/assets/applications/rag/openshift/values.yaml", "backend"),
-        ("ai-services/assets/applications/rag-dev/podman/values.yaml", "backend"),
-        ("ai-services/assets/applications/rag-dev/openshift/values.yaml", "backend"),
-        ("ai-services/assets/applications/rag-cpu/podman/values.yaml", "backend"),
-        ("ai-services/assets/services/chat/podman/values.yaml", "backend"),
-    ],
-    "services/digitize/Makefile": [
-        ("ai-services/assets/applications/rag/podman/values.yaml", "digitize"),
-        ("ai-services/assets/applications/rag/openshift/values.yaml", "digitize"),
-        ("ai-services/assets/applications/rag-dev/podman/values.yaml", "digitize"),
-        ("ai-services/assets/applications/rag-dev/openshift/values.yaml", "digitize"),
-        ("ai-services/assets/applications/rag-cpu/podman/values.yaml", "digitize"),
-        ("ai-services/assets/services/digitize/podman/values.yaml", "digitize"),
-    ],
-    "services/summarize/Makefile": [
-        ("ai-services/assets/applications/rag/podman/values.yaml", "summarize"),
-        ("ai-services/assets/applications/rag/openshift/values.yaml", "summarize"),
-        ("ai-services/assets/applications/rag-dev/podman/values.yaml", "summarize"),
-        ("ai-services/assets/applications/rag-dev/openshift/values.yaml", "summarize"),
-        ("ai-services/assets/applications/rag-cpu/podman/values.yaml", "summarize"),
-        ("ai-services/assets/services/summarize/podman/values.yaml", "summarize"),
-    ],
-    "services/similarity/Makefile": [
-        ("ai-services/assets/applications/rag/podman/values.yaml", "similarity"),
-        ("ai-services/assets/applications/rag/openshift/values.yaml", "similarity"),
-        ("ai-services/assets/applications/rag-dev/podman/values.yaml", "similarity"),
-        ("ai-services/assets/applications/rag-dev/openshift/values.yaml", "similarity"),
-        ("ai-services/assets/applications/rag-cpu/podman/values.yaml", "similarity"),
-        ("ai-services/assets/services/similarity/podman/values.yaml", "similarity"),
-    ],
-    "ui/chatbot/Makefile": [
-        ("ai-services/assets/applications/rag/podman/values.yaml", "ui"),
-        ("ai-services/assets/applications/rag-dev/podman/values.yaml", "ui"),
-        ("ai-services/assets/applications/rag/openshift/values.yaml", "ui"),
-        ("ai-services/assets/applications/rag-dev/openshift/values.yaml", "ui"),
-        ("ai-services/assets/applications/rag-cpu/podman/values.yaml", "ui"),
-    ],
-    "ui/digitize/Makefile": [
-        ("ai-services/assets/applications/rag/openshift/values.yaml", "digitizeUi"),
-        ("ai-services/assets/applications/rag/podman/values.yaml", "digitizeUi"),
-        ("ai-services/assets/applications/rag-dev/openshift/values.yaml", "digitizeUi"),
-        ("ai-services/assets/applications/rag-dev/podman/values.yaml", "digitizeUi"),
-        ("ai-services/assets/applications/rag-cpu/podman/values.yaml", "digitizeUi"),
-    ],
-    "ui/catalog/Makefile": [
-        ("ai-services/assets/catalog/podman/values.yaml", "ui"),
-    ],
-    "ai-services/Makefile": [
-        ("ai-services/assets/catalog/podman/values.yaml", "backend"),
-    ],
-    "images/postgres/Makefile": [
-        ("ai-services/assets/catalog/podman/values.yaml", "db"),
-        ("ai-services/assets/applications/rag/podman/values.yaml", "postgres"),
-        ("ai-services/assets/applications/rag/openshift/values.yaml", "postgres"),
-        ("ai-services/assets/applications/rag-dev/podman/values.yaml", "postgres"),
-        ("ai-services/assets/applications/rag-dev/openshift/values.yaml", "postgres"),
-        ("ai-services/assets/applications/rag-cpu/podman/values.yaml", "postgres"),
-    ],
-    "images/litellm/Makefile": [
-        ("ai-services/assets/applications/rag-cpu/podman/values.yaml", "litellm"),
-    ],
-    "images/caddy/Makefile": [
-        ("ai-services/assets/catalog/podman/values.yaml", "caddy"),
-    ]
-}
-
-
-def get_makefile_info(makefile_path: Path) -> Tuple[str, str]:
-    """Extract IMAGE= and TAG= values from a Makefile, calculating TAG if it references other variables."""
-    content = makefile_path.read_text()
-
-    # Extract all variable definitions
-    variables = {}
-    for line in content.split('\n'):
-        # Match variable assignments: VAR?=value or VAR=value
-        var_match = re.match(r'^(\w+)\s*\??\s*=\s*(.+?)(?:\s*#.*)?$', line.strip())
-        if var_match:
-            var_name = var_match.group(1)
-            var_value = var_match.group(2).strip()
-            variables[var_name] = var_value
-
-    # Get IMAGE value
-    image = variables.get('IMAGE')
-    if not image:
-        raise ValueError(f"Could not find IMAGE= in {makefile_path}")
-
-    # Get TAG value
-    tag_value = variables.get('TAG')
-    if not tag_value:
-        raise ValueError(f"Could not find TAG= in {makefile_path}")
-
-    # If TAG references other variables, resolve them
-    # Handle patterns like: $(VAR1)-$(VAR2) or v$(VAR1)-$(VAR2)
-    def resolve_variables(value: str) -> str:
-        # Replace $(VAR) with actual values
-        pattern = r'\$\((\w+)\)'
-        while re.search(pattern, value):
-            match = re.search(pattern, value)
-            if match:
-                var_name = match.group(1)
-                var_replacement = variables.get(var_name, match.group(0))
-                value = value.replace(match.group(0), var_replacement)
-        return value
-
-    resolved_tag = resolve_variables(tag_value)
-    return image, resolved_tag
+from common import COMPONENTS, EXPECTED_REGISTRY, get_makefile_info
 
 
 def get_image_from_values_yaml(values_path: Path, key: str) -> Tuple[Optional[str], Optional[str]]:
     """
     Extract image name and tag from a values.yaml section.
 
+    If key is empty, reads the top-level 'image:' line directly (no section lookup).
     Example: key=backend, image line: icr.io/ai-services-cicd/rag:v0.0.32
     Returns: ("rag", "v0.0.32")
     """
     content = values_path.read_text()
 
-    # Find the section for the key and extract the image line within it
-    pattern = re.compile(
-        rf"^{key}:\s*\n(.*?)(?=^\w|\Z)",
-        re.MULTILINE | re.DOTALL,
-    )
-    section_match = pattern.search(content)
-    if not section_match:
-        raise ValueError(f"Could not find '{key}:' section in {values_path}")
+    if key == "":
+        # Top-level image field — no section wrapper, find the first bare `image:` line
+        image_match = re.search(r'^image:\s*["\']?(\S+?)["\']?\s*$', content, re.MULTILINE)
+        if not image_match:
+            raise ValueError(f"Could not find top-level 'image:' in {values_path}")
+        full_image = image_match.group(1).strip("\"'")
+    else:
+        # Find the section for the key and extract the image line within it
+        pattern = re.compile(
+            rf"^{key}:\s*\n(.*?)(?=^\w|\Z)",
+            re.MULTILINE | re.DOTALL,
+        )
+        section_match = pattern.search(content)
+        if not section_match:
+            raise ValueError(f"Could not find '{key}:' section in {values_path}")
 
-    section = section_match.group(1)
-    image_match = re.search(r"image:\s*(\S+)", section)
-    if not image_match:
-        raise ValueError(f"Could not find 'image:' in '{key}' section of {values_path}")
+        section = section_match.group(1)
+        image_match = re.search(r"image:\s*(\S+)", section)
+        if not image_match:
+            raise ValueError(f"Could not find 'image:' in '{key}' section of {values_path}")
 
-    full_image = image_match.group(1)
+        full_image = image_match.group(1)
 
     # Only validate images from our own registry
     if not full_image.startswith(EXPECTED_REGISTRY + "/"):

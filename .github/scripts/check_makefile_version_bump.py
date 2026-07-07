@@ -12,33 +12,7 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-# Map of component paths to their configuration
-# Format: (component_path, name)
-COMPONENTS = [
-    # Services Images
-    ("services/chatbot", "chatbot-service"),
-    ("services/digitize", "digitize-service"),
-    ("services/similarity", "similarity-service"),
-    ("services/summarize", "summarize-service"),
-    # Images
-    ("images/service-base", "service-base"),
-    ("images/postgres", "postgres"),
-    ("images/caddy", "caddy"),
-    ("images/litellm", "litellm"),
-    ("images/tools", "tools"),
-    # UI Images
-    ("ui/chatbot", "chatbot-ui"),
-    ("ui/digitize", "digitize-ui"),
-    ("ui/catalog", "catalog-ui"),
-    # Ai Services
-    ("ai-services", "ai-services"),
-]
-
-# Paths that don't require version bumps when modified
-EXCLUDED_PATHS = [
-    "ai-services/assets/catalog",
-    "ai-services/assets/bootstrap",
-]
+from common import EXCLUDED_PATHS, SOURCE_COMPONENTS as COMPONENTS
 
 
 def get_changed_files(base_ref: str) -> List[str]:
