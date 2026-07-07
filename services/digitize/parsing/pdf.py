@@ -1,3 +1,9 @@
+"""
+PDF parsing utilities.
+
+Format-specific, read-only inspection of PDF files:
+page count, TOC extraction, font-size analysis, page loading.
+"""
 # Standard library imports
 import logging
 from collections import Counter, defaultdict
@@ -43,7 +49,7 @@ def get_document_page_count(file_path: str) -> int:
     Returns:
         Page count (int), or 0 if unable to determine
     """
-    from digitize.docx_utils import estimate_docx_page_count
+    from digitize.parsing.docx import estimate_docx_page_count
 
     try:
         file_ext = Path(file_path).suffix.lower()

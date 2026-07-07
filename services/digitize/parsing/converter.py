@@ -1,3 +1,9 @@
+"""
+Docling conversion engine wrapper.
+
+Encapsulates all interaction with the Docling library:
+DocumentConverter setup, chunked conversion, format export.
+"""
 import logging
 import shutil
 import tempfile
@@ -9,7 +15,7 @@ from typing import Optional
 from common.misc_utils import get_logger, DoclingConversionError
 from common.retry_utils import retry_on_transient_error
 from digitize.settings import settings
-from digitize.pdf_utils import get_document_page_count
+from digitize.parsing.pdf import get_document_page_count
 from digitize.models import OutputFormat
 
 # Docling document conversion libraries
@@ -125,7 +131,7 @@ def convert_doc(path: str | Path, cache_dir: Optional[Path] = None) -> DoclingDo
         concatenated_doc = DoclingDocument.concatenate(docs=docs)
 
         logger.debug(f"Successfully concatenated {path}'s {len(docs)} chunks into single document")
-        
+
         return concatenated_doc
 
     finally:

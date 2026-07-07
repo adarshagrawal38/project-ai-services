@@ -1,6 +1,8 @@
 """
-Utilities for processing DOCX files, providing page count estimation and TOC extraction.
-This module provides DOCX-specific functionality parallel to PDF utilities.
+DOCX parsing utilities.
+
+Format-specific, read-only inspection of DOCX files:
+page count estimation, TOC extraction, Docling caption recovery.
 """
 import json
 import time
@@ -351,9 +353,7 @@ def get_docx_toc(docx_path: str) -> Dict[str, int]:
         
         if toc:
             logger.info(f"DOCX {docx_path}: extracted {len(toc)} TOC entries from combined extraction")
-
             logger.debug(f" extracted toc is {toc}")
-
             return toc
         
         # Fallback 1: Try formal TOC styles
@@ -362,9 +362,7 @@ def get_docx_toc(docx_path: str) -> Dict[str, int]:
         
         if toc:
             logger.info(f"DOCX {docx_path}: extracted {len(toc)} TOC entries from TOC styles")
-
             logger.debug(f" extracted toc is {toc}")
-
             return toc
         
         # Fallback 2: Try Heading styles
@@ -377,12 +375,12 @@ def get_docx_toc(docx_path: str) -> Dict[str, int]:
             logger.warning(f"DOCX {docx_path}: No TOC found using any method")
 
         logger.debug(f" extracted toc is {toc}")
-        
         return toc
         
     except Exception as e:
         logger.error(f"Error extracting TOC from {docx_path}: {e}")
         return {}
+
 
 # ============================================================================
 # NEW: TOC Style-Based Extraction Functions
@@ -392,16 +390,16 @@ def get_docx_toc(docx_path: str) -> Dict[str, int]:
 def extract_toc_level_from_style(style_name: str) -> int:
     """
     Extract TOC level from Word style name.
-    
+
     Examples:
         'TOC 1' -> 1
         'TOC 2' -> 2
         'toc 3' -> 3
         'TOC Heading' -> 1 (default)
-    
+
     Args:
         style_name: Word paragraph style name
-        
+
     Returns:
         TOC level as integer (defaults to 1 if no number found)
     """
@@ -409,7 +407,6 @@ def extract_toc_level_from_style(style_name: str) -> int:
     match = re.search(r'toc\s*(\d+)', style_name, re.IGNORECASE)
     if match:
         return int(match.group(1))
-    
     # If no number found (e.g., 'TOC Heading'), default to level 1
     return 1
 
@@ -418,12 +415,12 @@ def extract_toc_from_toc_styles(docx_path: str) -> Dict[str, int]:
     """
     Extract TOC from DOCX file by looking for TOC styles.
     This works ONLY if the document has a formal TOC field with TOC styles.
-    
+
     Word TOC styles are typically named: 'TOC 1', 'TOC 2', 'TOC 3', 'TOC Heading', etc.
-    
+
     Args:
         docx_path: Path to the DOCX file
-        
+
     Returns:
         Dictionary mapping TOC text to level (similar to PDF TOC format)
     """
@@ -450,7 +447,6 @@ def extract_toc_from_toc_styles(docx_path: str) -> Dict[str, int]:
                 "Document may not have a formal TOC field. "
                 "Consider using extract_toc_from_headings() instead."
             )
-        
         return toc
         
     except Exception as e:
@@ -462,10 +458,10 @@ def extract_toc_from_headings(docx_path: str) -> Dict[str, int]:
     """
     Extract TOC from DOCX Heading styles (Heading 1, Heading 2, etc.).
     This is a fallback when document doesn't have formal TOC field.
-    
+
     Args:
         docx_path: Path to the DOCX file
-        
+
     Returns:
         Dictionary mapping heading text to level
     """
@@ -495,14 +491,14 @@ def extract_toc_combined(docx_path: str) -> Dict[str, int]:
     """
     Extract TOC from BOTH 'Table Paragraph' and 'List Paragraph' styles.
     This captures TOC entries whether they're in tables or as list items.
-    
+
     This is the recommended approach as it handles various TOC formats:
     - TOC in tables (Table Paragraph style)
     - TOC as lists (List Paragraph style)
-    
+
     Args:
         docx_path: Path to the DOCX file
-        
+
     Returns:
         Dictionary mapping TOC text to level
     """
@@ -540,11 +536,8 @@ def extract_toc_combined(docx_path: str) -> Dict[str, int]:
                                     table_count += 1
         
         logger.debug(f"Extracted {table_count} entries from Table Paragraph style")
-
         logger.info(f"Total unique TOC entries extracted: {len(toc)}")
-
         logger.debug(f"Extracted tocs : {toc}")
-        
         return toc
         
     except Exception as e:
@@ -555,7 +548,7 @@ def extract_toc_combined(docx_path: str) -> Dict[str, int]:
 def _infer_toc_level_from_text(text: str) -> int:
     """
     Infer TOC level from text content.
-    
+
     Heuristics:
     - "Chapter X" -> level 1
     - "X " (single number) -> level 2
@@ -563,10 +556,10 @@ def _infer_toc_level_from_text(text: str) -> int:
     - "X.Y.Z " (three numbers) -> level 4
     - Common sections -> level 1
     - Default -> level 2
-    
+
     Args:
         text: TOC entry text
-        
+
     Returns:
         Inferred level (1-5)
     """
