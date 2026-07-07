@@ -8,7 +8,7 @@ ARG GO_VERSION
 
 RUN microdnf install -y wget tar gzip git && microdnf clean all
 
-RUN curl -fsSL https://go.dev/dl/go${GO_VERSION}.linux-ppc64le.tar.gz -o go.tar.gz && \
+RUN wget -q https://go.dev/dl/go${GO_VERSION}.linux-ppc64le.tar.gz -O go.tar.gz && \
     tar -C /usr/local -xzf go.tar.gz && \
     rm go.tar.gz
 
@@ -24,7 +24,7 @@ FROM registry.access.redhat.com/ubi9/ubi-minimal:9.8
 
 ARG CADDY_VERSION
 
-RUN microdnf install -y ca-certificates libcap wget && microdnf clean all
+RUN microdnf install -y ca-certificates libcap wget shadow-utils && microdnf clean all
 
 RUN set -eux; \
     groupadd --system --gid 1000 caddy; \
@@ -44,8 +44,6 @@ RUN set -eux; \
 ENV XDG_CONFIG_HOME=/config
 ENV XDG_DATA_HOME=/data
 
-USER caddy
-
 LABEL org.opencontainers.image.version=${CADDY_VERSION}
 LABEL org.opencontainers.image.title=Caddy
 LABEL org.opencontainers.image.description="a powerful, enterprise-ready, open source web server with automatic HTTPS written in Go"
@@ -57,5 +55,7 @@ EXPOSE 443/udp
 EXPOSE 2019/tcp
 
 WORKDIR /srv
+
+USER caddy
 
 CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
