@@ -27,8 +27,8 @@ ARG CADDY_VERSION
 RUN microdnf install -y ca-certificates libcap wget shadow-utils && microdnf clean all
 
 RUN set -eux; \
-    groupadd --system --gid 1000 caddy; \
-    useradd --system --uid 1000 --gid caddy --shell /sbin/nologin --no-create-home caddy; \
+    groupadd --system --gid 1196 caddy; \
+    useradd --system --uid 1196 --gid caddy --shell /sbin/nologin --no-create-home caddy; \
     mkdir -p /config/caddy /data/caddy /etc/caddy /usr/share/caddy; \
     wget -O /etc/caddy/Caddyfile "https://github.com/caddyserver/dist/raw/${CADDY_VERSION}/config/Caddyfile"; \
     wget -O /usr/share/caddy/index.html "https://github.com/caddyserver/dist/raw/${CADDY_VERSION}/welcome/index.html"; \
