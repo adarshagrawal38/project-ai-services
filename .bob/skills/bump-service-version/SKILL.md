@@ -1,6 +1,6 @@
 ---
 name: bump-service-version
-description: Use when the user wants to bump, update, or change the version/image tag of any service, UI component, or the catalog backend (ai-services) inside the ai-services project. Runs make release to auto-detect all modified components, bump their Makefile TAGs, and sync all values.yaml files in one shot.
+description: Use when the user wants to bump, update, or change the version/image tag of any service, UI component, or the catalog backend (ai-services) inside the ai-services project. Runs make bump-up-image-version to auto-detect all modified components, bump their Makefile TAGs, and sync all values.yaml files in one shot.
 metadata:
   argument-hint: "<optional: base-branch>"
 ---
@@ -8,27 +8,27 @@ metadata:
 # Bump Service Version
 
 Bumps the TAG in every modified component Makefile and syncs all corresponding `values.yaml`
-files using the repo-root `make release` target. No manual component selection required —
+files using the repo-root `make bump-up-image-version` target. No manual component selection required —
 changed components are auto-detected via git diff.
 
 ## Available make targets
 
 | Target | What it does |
 |---|---|
-| `make release` | Auto-detect changed components → bump TAGs → sync all `values.yaml` |
-| `make release REGISTRY=<url>` | Same, with a custom registry |
-| `make release BASE_BRANCH=<ref>` | Same, diffing against a different base branch |
+| `make bump-up-image-version` | Auto-detect changed components → bump TAGs → sync all `values.yaml` |
+| `make bump-up-image-version REGISTRY=<url>` | Same, with a custom registry |
+| `make bump-up-image-version BASE_BRANCH=<ref>` | Same, diffing against a different base branch |
 
 ---
 
 ## Step 1 — Run release
 
 ```
-execute_command: make release
+execute_command: make bump-up-image-version
 ```
 
-This runs `bump-tags` (auto-detects changed components from git diff, bumps each Makefile TAG
-from the base-branch value + 1) followed by `update-tags` (syncs every modified Makefile's
+This runs `bump-makefile-tags` (auto-detects changed components from git diff, bumps each Makefile TAG
+from the base-branch value + 1) followed by `bump-values-yaml` (syncs every modified Makefile's
 new TAG into the corresponding `values.yaml` files).
 
 ---
