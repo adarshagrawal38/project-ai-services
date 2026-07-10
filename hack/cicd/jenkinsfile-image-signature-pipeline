@@ -16,10 +16,22 @@ pipeline {
             defaultValue: '',
             description: 'IAM api key to push image to icr registry (overrides icr-iam-creds credential when set)'
         )
-        string(
+        text(
             name: 'SKIP_IMAGE_LIST',
-            defaultValue: ''
-            
+            defaultValue: '',
+            description: '''List of images to skip building (one per line). Available image names:
+  chatbot-service
+  digitize-service
+  summarize-service
+  similarity-service
+  caddy
+  litellm
+  postgres
+  tools
+  ai-services
+  catalog-ui
+  digitize-ui
+  chatbot-ui'''
         )
     }
     
@@ -55,6 +67,7 @@ pipeline {
         }
 
         stage('Build chatbot service') {
+            when { expression { !isImageSkipped('chatbot-service') } }
             steps {
                 script {
                     env.ICR_SERVICES_CHATBOT_IMAGE = buildAndPublishImage('services/chatbot/', 'chatbot-service')
@@ -63,6 +76,7 @@ pipeline {
         }
 
         stage('Build digitize service') {
+            when { expression { !isImageSkipped('digitize-service') } }
             steps {
                 script {
                     env.ICR_SERVICES_DIGITIZE_IMAGE = buildAndPublishImage('services/digitize/', 'digitize-service')
@@ -71,6 +85,7 @@ pipeline {
         }
 
         stage('Build summarize service') {
+            when { expression { !isImageSkipped('summarize-service') } }
             steps {
                 script {
                     env.ICR_SERVICES_SUMMARIZE_IMAGE = buildAndPublishImage('services/summarize/', 'summarize-service')
@@ -79,6 +94,7 @@ pipeline {
         }
 
         stage('Build similarity service') {
+            when { expression { !isImageSkipped('similarity-service') } }
             steps {
                 script {
                     env.ICR_SERVICES_SIMILARITY_IMAGE = buildAndPublishImage('services/similarity/', 'similarity-service')
@@ -87,6 +103,7 @@ pipeline {
         }
 
         stage('Build Caddy') {
+            when { expression { !isImageSkipped('caddy') } }
             steps {
                 script {
                     env.ICR_CADDY_IMAGE = buildAndPublishImage('images/caddy/', 'caddy')
@@ -95,6 +112,7 @@ pipeline {
         }
 
         stage('Build litellm') {
+            when { expression { !isImageSkipped('litellm') } }
             steps {
                 script {
                     env.ICR_LITELLM_IMAGE = buildAndPublishImage('images/litellm/', 'litellm')
@@ -103,6 +121,7 @@ pipeline {
         }
 
         stage('Build postgres') {
+            when { expression { !isImageSkipped('postgres') } }
             steps {
                 script {
                     env.ICR_POSTGRES_IMAGE = buildAndPublishImage('images/postgres/', 'postgres')
@@ -111,6 +130,7 @@ pipeline {
         }
 
         stage('Build Tools AMD64') {
+            when { expression { !isImageSkipped('tools') } }
             agent { label 'shared-x86-centos9' }
             steps {
                 script {
@@ -122,6 +142,7 @@ pipeline {
         }
 
         stage('Build Tools ARM64') {
+            when { expression { !isImageSkipped('tools') } }
             agent { label 'shared-x86-centos9' }
             steps {
                 script {
@@ -131,6 +152,7 @@ pipeline {
         }
 
         stage('Build Tools PPC64LE') {
+            when { expression { !isImageSkipped('tools') } }
             steps {
                 script {
                     env.ICR_TOOL_IMAGE_PPC64LE = buildAndPublishImage('images/tools/', 'tools')
@@ -139,6 +161,7 @@ pipeline {
         }
 
         stage('Create Tools Manifest') {
+            when { expression { !isImageSkipped('tools') } }
             agent { label 'shared-x86-centos9' }
             steps {
                 script {
@@ -148,6 +171,7 @@ pipeline {
         }
 
         stage('Build AI Services') {
+            when { expression { !isImageSkipped('ai-services') } }
             steps {
                 script {
                     env.ICR_AI_SERVICES_IMAGE = buildAndPublishImage('ai-services', 'ai-services')
@@ -156,6 +180,7 @@ pipeline {
         }
 
         stage('Build UI Catalog') {
+            when { expression { !isImageSkipped('catalog-ui') } }
             steps {
                 script {
                     env.ICR_UI_CATALOG_IMAGE = buildAndPublishImage('ui/catalog', 'catalog-ui')
@@ -164,6 +189,7 @@ pipeline {
         }
 
         stage('Build UI Digitize') {
+            when { expression { !isImageSkipped('digitize-ui') } }
             steps {
                 script {
                     env.ICR_UI_DIGITIZE_IMAGE = buildAndPublishImage('ui/digitize', 'digitize-ui')
@@ -171,6 +197,7 @@ pipeline {
             }
         }
         stage('Build UI Chatbot') {
+            when { expression { !isImageSkipped('chatbot-ui') } }
             steps {
                 script {
                     env.ICR_UI_CHATBOT_IMAGE = buildAndPublishImage('ui/chatbot', 'chatbot-ui')
@@ -266,6 +293,17 @@ pipeline {
     }
 }
 
+
+/**
+ * Returns true if the given imageName is present in the SKIP_IMAGE_LIST parameter.
+ * SKIP_IMAGE_LIST is a newline-separated list of image names to skip.
+ */
+def isImageSkipped(String imageName) {
+    return params.SKIP_IMAGE_LIST
+        .tokenize('\n')
+        .collect { it.trim() }
+        .contains(imageName)
+}
 
 def checkoutRepository() {
     echo "Checking out repository at version ${params.VERSION}..."
@@ -453,8 +491,8 @@ def generateImageList() {
         env.ICR_LITELLM_IMAGE,
         env.ICR_POSTGRES_IMAGE,
         env.ICR_TOOL_IMAGE,
-        env.ICR_AI_SERVICES_IMAGE    
-    ]
+        env.ICR_AI_SERVICES_IMAGE
+    ].findAll { it != null }
 
     def imageList = images.join('\n') + '\n'
 
