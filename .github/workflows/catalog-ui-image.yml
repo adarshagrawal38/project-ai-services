@@ -15,10 +15,6 @@ concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-env:
-  ICR_REGISTRY: icr.io
-  ICR_NAMESPACE: ai-services-cicd
-
 jobs:
   format:
     name: format
@@ -26,7 +22,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -49,7 +45,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Use Node.js
         uses: actions/setup-node@v6
@@ -69,25 +65,10 @@ jobs:
   build-publish-image:
     name: Build and Publish Image
     needs: [format, lint]
-    runs-on: ubuntu-24.04-ppc64le
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Build catalog-ui image
-        working-directory: ui/catalog
-        run: |
-          make build REGISTRY=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }}
-
-      - name: Publish catalog-ui image
-        working-directory: ui/catalog
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release-'))
-        run: |
-          make push \
-            REGISTRY=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }} \
-            REGISTRY_USER=${{ secrets.ICR_USERNAME }} \
-            REGISTRY_PASSWORD=${{ secrets.ICR_APIKEY }}
+    uses: ./.github/workflows/build-and-publish-image.yml
+    with:
+      working-directory: 'ui/catalog'
+    secrets: inherit
 
   scan:
     uses: ./.github/workflows/scanner.yml
