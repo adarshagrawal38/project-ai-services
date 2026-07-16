@@ -23,7 +23,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build-publish-image-ppc64le:
+  build-publish-image:
     strategy:
       matrix:
         include:
@@ -42,7 +42,7 @@ jobs:
 
   create-manifest:
     name: Create Multi-Arch Manifest
-    needs: [build-publish-image-ppc64le, build-publish-image-amd64, build-publish-image-arm64]
+    needs: build-publish-image
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release-'))
     steps:
