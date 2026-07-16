@@ -24,27 +24,20 @@ concurrency:
 
 jobs:
   build-publish-image-ppc64le:
-    name: Build and Publish Image (ppc64le)
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-24.04-ppc64le
+            arch: ppc64le
+          - os: ubuntu-24.04  # Standard amd64
+            arch: amd64
+          - os: ubuntu-24.04-arm
+            arch: arm64
+    name: Build and Publish Image (${{ matrix.arch }})
     uses: ./.github/workflows/build-and-publish-image.yml
     with:
       working-directory: 'images/tools'
-      runner: 'ubuntu-24.04-ppc64le'
-    secrets: inherit
-
-  build-publish-image-amd64:
-    name: Build and Publish Image (amd64)
-    uses: ./.github/workflows/build-and-publish-image.yml
-    with:
-      working-directory: 'images/tools'
-      runner: 'ubuntu-24.04'
-    secrets: inherit
-
-  build-publish-image-arm64:
-    name: Build and Publish Image (arm64)
-    uses: ./.github/workflows/build-and-publish-image.yml
-    with:
-      working-directory: 'images/tools'
-      runner: 'ubuntu-24.04-arm'
+      runner: ${{ matrix.os }}
     secrets: inherit
 
   create-manifest:
