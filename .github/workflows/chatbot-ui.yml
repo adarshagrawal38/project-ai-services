@@ -10,6 +10,9 @@ on:
     paths:
       - 'ui/chatbot/**'
       - .github/workflows/chatbot-ui.yml
+    branches:
+      - main
+      - 'release-*'
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"

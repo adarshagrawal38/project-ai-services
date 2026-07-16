@@ -10,6 +10,9 @@ on:
     paths:
       - 'ai-services/**'
       - .github/workflows/ai-services-image.yml
+    branches:
+      - main
+      - 'release-*'
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"

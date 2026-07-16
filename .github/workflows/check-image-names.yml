@@ -12,6 +12,7 @@ on:
       - .github/scripts/check_image_names.py
     branches:
       - main
+      - 'release-*'
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"

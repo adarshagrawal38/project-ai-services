@@ -10,45 +10,46 @@ on:
     paths:
       - 'images/tools/**'
       - .github/workflows/tools-image.yml
-
-concurrency:
-  group: "${{ github.workflow }}-${{ github.ref }}"
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    branches:
+      - main
+      - 'release-*'
 
 env:
   ICR_REGISTRY: icr.io
   ICR_NAMESPACE: ai-services-cicd
 
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  build-publish-image:
-    name: Build Arch Specific Image
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-24.04-ppc64le
-            arch: ppc64le
-          - os: ubuntu-24.04  # Standard amd64
-            arch: amd64
-          - os: ubuntu-24.04-arm
-            arch: arm64
-    runs-on: ${{ matrix.os }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v7
+  build-publish-image-ppc64le:
+    name: Build and Publish Image (ppc64le)
+    uses: ./.github/workflows/build-and-publish-image.yml
+    with:
+      working-directory: 'images/tools'
+      runner: 'ubuntu-24.04-ppc64le'
+    secrets: inherit
 
-      - name: Build tools image
-        working-directory: images/tools
-        run: |
-          make build REGISTRY=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }}
+  build-publish-image-amd64:
+    name: Build and Publish Image (amd64)
+    uses: ./.github/workflows/build-and-publish-image.yml
+    with:
+      working-directory: 'images/tools'
+      runner: 'ubuntu-24.04'
+    secrets: inherit
 
-      - name: Publish tools image
-        working-directory: images/tools
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release-'))
-        run: |
-          make push REGISTRY=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }} REGISTRY_USER=${{ secrets.ICR_USERNAME }} REGISTRY_PASSWORD=${{ secrets.ICR_APIKEY }}
+  build-publish-image-arm64:
+    name: Build and Publish Image (arm64)
+    uses: ./.github/workflows/build-and-publish-image.yml
+    with:
+      working-directory: 'images/tools'
+      runner: 'ubuntu-24.04-arm'
+    secrets: inherit
+
   create-manifest:
     name: Create Multi-Arch Manifest
-    needs: build-publish-image
+    needs: [build-publish-image-ppc64le, build-publish-image-amd64, build-publish-image-arm64]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release-'))
     steps:
@@ -59,6 +60,7 @@ jobs:
         working-directory: images/tools
         run: |
           make manifest REGISTRY=${{ env.ICR_REGISTRY }}/${{ env.ICR_NAMESPACE }} REGISTRY_USER=${{ secrets.ICR_USERNAME }} REGISTRY_PASSWORD=${{ secrets.ICR_APIKEY }}
+
   scan:
     uses: ./.github/workflows/scanner.yml
     with:

@@ -10,6 +10,9 @@ on:
     paths:
       - 'ui/digitize/**'
       - .github/workflows/digitize-ui-image.yml
+    branches:
+      - main
+      - 'release-*'
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"

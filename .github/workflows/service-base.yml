@@ -10,6 +10,9 @@ on:
     paths:
       - 'images/service-base/**'
       - .github/workflows/service-base.yml
+    branches:
+      - main
+      - 'release-*'
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.ref }}"

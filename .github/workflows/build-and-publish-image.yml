@@ -10,6 +10,10 @@ on:
       working-directory:
        required: true
        type: string
+      runner:
+       required: false
+       type: string
+       default: 'ubuntu-24.04-ppc64le'
 
 env:
   ICR_REGISTRY: icr.io
@@ -17,7 +21,7 @@ env:
 
 jobs:
   build-publish-image:
-    runs-on: ubuntu-24.04-ppc64le
+    runs-on: ${{ inputs.runner }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
