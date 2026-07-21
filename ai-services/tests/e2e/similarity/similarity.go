@@ -249,10 +249,6 @@ func intPtr(i int) *int { return &i }
 // boolPtr returns a pointer to the given bool — convenience helper for Rerank in requests.
 func boolPtr(b bool) *bool { return &b }
 
-// -----------------------------------------------------------------------
-// C82598931 – Verify GET /health endpoint
-// -----------------------------------------------------------------------
-
 // VerifyHealthEndpoint calls GET /health and validates that the response is HTTP 200
 // with a non-empty status field.
 //
@@ -275,10 +271,6 @@ func VerifyHealthEndpoint(ctx context.Context, baseURL string) (*HealthResponse,
 
 	return resp, nil
 }
-
-// -----------------------------------------------------------------------
-// C82562673 (podman) – Verify time info in response headers or body
-// -----------------------------------------------------------------------
 
 // VerifyTimeInfoInResponse calls POST /v1/similarity-search and checks that the API
 // includes timing information either in the response headers (e.g. X-Response-Time,
@@ -380,10 +372,6 @@ func VerifyInvalidModeReturns400(ctx context.Context, baseURL string) (*Similari
 	return errResp, nil
 }
 
-// -----------------------------------------------------------------------
-// C82598625 – Different search modes: dense, sparse, hybrid
-// -----------------------------------------------------------------------
-
 // VerifySearchModes calls POST /v1/similarity-search for each of the three supported
 // modes and returns a map of mode → (response, error).
 //
@@ -419,10 +407,6 @@ func VerifySearchModes(ctx context.Context, baseURL string) map[string]*Similari
 	return results
 }
 
-// -----------------------------------------------------------------------
-// C82598629 – Rerank: true
-// -----------------------------------------------------------------------
-
 // VerifyRerankTrue posts a similarity-search request with rerank=true and asserts that
 // the response includes score_type "relevance" (the reranker output type).
 //
@@ -453,10 +437,6 @@ func VerifyRerankTrue(ctx context.Context, baseURL string) (*SimilaritySearchRes
 	return resp, nil
 }
 
-// -----------------------------------------------------------------------
-// C82598633 – Invalid top_k value → 400 Bad Request
-// -----------------------------------------------------------------------
-
 // VerifyInvalidTopKReturns400 posts a similarity-search request with a negative top_k
 // value and asserts that the API returns HTTP 400.
 //
@@ -481,39 +461,6 @@ func VerifyInvalidTopKReturns400(ctx context.Context, baseURL string) (*Similari
 
 	return errResp, nil
 }
-
-
-// -----------------------------------------------------------------------
-// C82598926 – Reproduce 500: Internal Server Error
-// -----------------------------------------------------------------------
-
-// ReproduceInternalServerError posts a similarity-search request that is expected to
-// trigger an internal server error and asserts HTTP 500 is returned.
-//
-// Corresponds to test case C82598926.
-// func ReproduceInternalServerError(ctx context.Context, baseURL string) (*SimilarityErrorResponse, error) {
-// 	req := SimilaritySearchRequest{
-// 		Query: "how to configure network",
-// 		Mode:  "dense",
-// 	}
-
-// 	errResp, statusCode, err := SimilaritySearchExpectingError(ctx, baseURL, req)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("[C82598926] request failed: %w", err)
-// 	}
-
-// 	if statusCode != http.StatusInternalServerError {
-// 		return errResp, fmt.Errorf("[C82598926] expected HTTP 500, got %d (error: %s)", statusCode, errResp.Error)
-// 	}
-
-// 	logger.Infof("[C82598926] Reproduced 500 → %s", errResp.Error)
-
-// 	return errResp, nil
-// }
-
-// -----------------------------------------------------------------------
-// C82598928 – Reproduce 422: Unprocessable Entity (validation error)
-// -----------------------------------------------------------------------
 
 // ReproduceValidationError posts a similarity-search request with a missing required
 // field (empty query) and asserts HTTP 422 is returned.

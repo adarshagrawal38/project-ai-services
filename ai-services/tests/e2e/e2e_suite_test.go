@@ -1624,8 +1624,8 @@ var _ = ginkgo.Describe("AI Services End-to-End Tests", ginkgo.Ordered, func() {
 				logger.Infof("[TEST] Timing info verified in similarity-api response")
 			})
 
-		// C82595474 — Verify /v1/similarity-search returns 400 for invalid mode
-		ginkgo.It("C82595474: Verify /v1/similarity-search endpoint by providing invalid parameter for mode field (400 error code)",
+		// Verify /v1/similarity-search returns 400 for invalid mode
+		ginkgo.It("Verify /v1/similarity-search endpoint by providing invalid parameter for mode field (400 error code)",
 			func() {
 				ctx, cancel := withTimeout(30 * time.Second)
 				defer cancel()
@@ -1635,11 +1635,11 @@ var _ = ginkgo.Describe("AI Services End-to-End Tests", ginkgo.Ordered, func() {
 				gomega.Expect(errResp).NotTo(gomega.BeNil())
 				gomega.Expect(errResp.Error).NotTo(gomega.BeEmpty())
 				gomega.Expect(errResp.Error).To(gomega.ContainSubstring("mode must be one of"))
-				logger.Infof("[TEST] C82595474: invalid mode correctly rejected with: %s", errResp.Error)
+				logger.Infof("[TEST] invalid mode correctly rejected with: %s", errResp.Error)
 			})
 
-		// C82598625 — Verify /v1/similarity-search with dense, sparse, and hybrid modes
-		ginkgo.It("C82598625: Verify /v1/similarity-search endpoint by providing different search mode such as dense, sparse or hybrid",
+		// Verify /v1/similarity-search with dense, sparse, and hybrid modes
+		ginkgo.It("Verify /v1/similarity-search endpoint by providing different search mode such as dense, sparse or hybrid",
 			func() {
 				ctx, cancel := withTimeout(20 * time.Minute)
 				defer cancel()
@@ -1692,8 +1692,8 @@ var _ = ginkgo.Describe("AI Services End-to-End Tests", ginkgo.Ordered, func() {
 					"all search modes failed — index may be empty or similarity-api is unreachable")
 			})
 
-		// C82598629 — Verify /v1/similarity-search with rerank=true
-		ginkgo.It("C82598629: Verify /v1/similarity-search endpoint by providing rerank as true",
+		// Verify /v1/similarity-search with rerank=true
+		ginkgo.It("Verify /v1/similarity-search endpoint by providing rerank as true",
 			func() {
 				ctx, cancel := withTimeout(2 * time.Minute)
 				defer cancel()
@@ -1702,12 +1702,12 @@ var _ = ginkgo.Describe("AI Services End-to-End Tests", ginkgo.Ordered, func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(resp).NotTo(gomega.BeNil())
 				gomega.Expect(resp.ScoreType).To(gomega.Equal("relevance"))
-				logger.Infof("[TEST] C82598629: rerank=true returned score_type=%s results=%d",
+				logger.Infof("[TEST] rerank=true returned score_type=%s results=%d",
 					resp.ScoreType, len(resp.Results))
 			})
 
 		// C82598633 — Verify /v1/similarity-search returns 400 for invalid top_k
-		ginkgo.It("C82598633: Verify /v1/similarity-search endpoint by providing invalid value for top_k",
+		ginkgo.It("Verify /v1/similarity-search endpoint by providing invalid value for top_k",
 			func() {
 				ctx, cancel := withTimeout(30 * time.Second)
 				defer cancel()
@@ -1716,37 +1716,11 @@ var _ = ginkgo.Describe("AI Services End-to-End Tests", ginkgo.Ordered, func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(errResp).NotTo(gomega.BeNil())
 				gomega.Expect(errResp.Error).NotTo(gomega.BeEmpty())
-				logger.Infof("[TEST] C82598633: invalid top_k correctly rejected with: %s", errResp.Error)
+				logger.Infof("[TEST] invalid top_k correctly rejected with: %s", errResp.Error)
 			})
 
-		// C82598925 — Reproduce 503: Service Unavailable
-		// ginkgo.It("C82598925: Reproduce 503 Service Unavailable error code",
-		// 	func() {
-		// 		ctx, cancel := withTimeout(30 * time.Second)
-		// 		defer cancel()
-
-		// 		errResp, err := similarity.ReproduceServiceUnavailable(ctx, similarityBaseURL)
-		// 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		// 		gomega.Expect(errResp).NotTo(gomega.BeNil())
-		// 		gomega.Expect(errResp.Error).NotTo(gomega.BeEmpty())
-		// 		logger.Infof("[TEST] C82598925: 503 reproduced with error: %s", errResp.Error)
-		// 	})
-
-		// C82598926 — Reproduce 500: Internal Server Error
-		// ginkgo.It("C82598926: Reproduce 500 Internal Server Error code for similarity-search endpoint",
-		// 	func() {
-		// 		ctx, cancel := withTimeout(30 * time.Second)
-		// 		defer cancel()
-
-		// 		errResp, err := similarity.ReproduceInternalServerError(ctx, similarityBaseURL)
-		// 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
-		// 		gomega.Expect(errResp).NotTo(gomega.BeNil())
-		// 		gomega.Expect(errResp.Error).NotTo(gomega.BeEmpty())
-		// 		logger.Infof("[TEST] C82598926: 500 reproduced with error: %s", errResp.Error)
-		// 	})
-
-		// C82598928 — Reproduce 422: Validation Error
-		ginkgo.It("C82598928: Reproduce 422 validation error code for similarity-search endpoint",
+		// Reproduce 422: Validation Error
+		ginkgo.It("Reproduce 422 validation error code for similarity-search endpoint",
 			func() {
 				ctx, cancel := withTimeout(30 * time.Second)
 				defer cancel()
@@ -1755,7 +1729,7 @@ var _ = ginkgo.Describe("AI Services End-to-End Tests", ginkgo.Ordered, func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(errResp).NotTo(gomega.BeNil())
 				gomega.Expect(errResp.Error).NotTo(gomega.BeEmpty())
-				logger.Infof("[TEST] C82598928: 422 reproduced with error: %s", errResp.Error)
+				logger.Infof("[TEST] 422 reproduced with error: %s", errResp.Error)
 			})
 	})
 	ginkgo.Context("Application Teardown", func() {
