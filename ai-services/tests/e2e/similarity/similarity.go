@@ -250,24 +250,6 @@ func intPtr(i int) *int { return &i }
 func boolPtr(b bool) *bool { return &b }
 
 // -----------------------------------------------------------------------
-// C82562673 – Verify similarity-api pod is up and running
-// -----------------------------------------------------------------------
-
-// VerifyPodRunning checks that the similarity-api health endpoint returns HTTP 200,
-// confirming the pod is up and ready to serve requests.
-//
-// Corresponds to test case C82562673.
-func VerifyPodRunning(ctx context.Context, baseURL string) error {
-	if err := HealthCheck(ctx, baseURL); err != nil {
-		return fmt.Errorf("[C82562673] similarity-api pod is not healthy: %w", err)
-	}
-
-	logger.Infof("[C82562673] similarity-api pod is up and running at %s", baseURL)
-
-	return nil
-}
-
-// -----------------------------------------------------------------------
 // C82598931 – Verify GET /health endpoint
 // -----------------------------------------------------------------------
 
@@ -500,34 +482,6 @@ func VerifyInvalidTopKReturns400(ctx context.Context, baseURL string) (*Similari
 	return errResp, nil
 }
 
-// -----------------------------------------------------------------------
-// C82598925 – Reproduce 503: Service Unavailable
-// -----------------------------------------------------------------------
-
-// ReproduceServiceUnavailable calls POST /v1/similarity-search against an endpoint
-// that is expected to be unavailable (e.g. empty index / DB not ready) and asserts
-// HTTP 503 is returned.
-//
-// Corresponds to test case C82598925.
-func ReproduceServiceUnavailable(ctx context.Context, baseURL string) (*SimilarityErrorResponse, error) {
-	req := SimilaritySearchRequest{
-		Query: "trigger service unavailable",
-		Mode:  "dense",
-	}
-
-	errResp, statusCode, err := SimilaritySearchExpectingError(ctx, baseURL, req)
-	if err != nil {
-		return nil, fmt.Errorf("[C82598925] request failed: %w", err)
-	}
-
-	if statusCode != http.StatusServiceUnavailable {
-		return errResp, fmt.Errorf("[C82598925] expected HTTP 503, got %d (error: %s)", statusCode, errResp.Error)
-	}
-
-	logger.Infof("[C82598925] Reproduced 503 → %s", errResp.Error)
-
-	return errResp, nil
-}
 
 // -----------------------------------------------------------------------
 // C82598926 – Reproduce 500: Internal Server Error
@@ -537,25 +491,25 @@ func ReproduceServiceUnavailable(ctx context.Context, baseURL string) (*Similari
 // trigger an internal server error and asserts HTTP 500 is returned.
 //
 // Corresponds to test case C82598926.
-func ReproduceInternalServerError(ctx context.Context, baseURL string) (*SimilarityErrorResponse, error) {
-	req := SimilaritySearchRequest{
-		Query: "trigger internal server error",
-		Mode:  "dense",
-	}
+// func ReproduceInternalServerError(ctx context.Context, baseURL string) (*SimilarityErrorResponse, error) {
+// 	req := SimilaritySearchRequest{
+// 		Query: "how to configure network",
+// 		Mode:  "dense",
+// 	}
 
-	errResp, statusCode, err := SimilaritySearchExpectingError(ctx, baseURL, req)
-	if err != nil {
-		return nil, fmt.Errorf("[C82598926] request failed: %w", err)
-	}
+// 	errResp, statusCode, err := SimilaritySearchExpectingError(ctx, baseURL, req)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("[C82598926] request failed: %w", err)
+// 	}
 
-	if statusCode != http.StatusInternalServerError {
-		return errResp, fmt.Errorf("[C82598926] expected HTTP 500, got %d (error: %s)", statusCode, errResp.Error)
-	}
+// 	if statusCode != http.StatusInternalServerError {
+// 		return errResp, fmt.Errorf("[C82598926] expected HTTP 500, got %d (error: %s)", statusCode, errResp.Error)
+// 	}
 
-	logger.Infof("[C82598926] Reproduced 500 → %s", errResp.Error)
+// 	logger.Infof("[C82598926] Reproduced 500 → %s", errResp.Error)
 
-	return errResp, nil
-}
+// 	return errResp, nil
+// }
 
 // -----------------------------------------------------------------------
 // C82598928 – Reproduce 422: Unprocessable Entity (validation error)

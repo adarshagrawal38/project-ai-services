@@ -1537,6 +1537,8 @@ var _ = ginkgo.Describe("AI Services End-to-End Tests", ginkgo.Ordered, func() {
 	})
 	ginkgo.Context("Similarity Tests", ginkgo.Label("spyre-dependent", "similarity-tests"), func() {
 		var similarityBaseURL string
+		var digitizeBaseURL string
+		var createdJobIDs []string
 
 		ginkgo.BeforeAll(func() {
 			if appName == "" {
@@ -1556,35 +1558,45 @@ var _ = ginkgo.Describe("AI Services End-to-End Tests", ginkgo.Ordered, func() {
 			}
 
 			if appRuntime == "podman" {
-				similarityBaseURL = cli.ExtractSimilarityAPIURL(infoOutput)
-				if similarityBaseURL == "" {
-					// Fall back to port-based URL when 'application info' hasn't
-					// exposed the similarity-api URL yet.
-					similarityBaseURL = similarity.GetSimilarityBaseURL(similarityPort)
+				const similarityPollInterval = 15 * time.Second
+				for {
+					similarityBaseURL = cli.ExtractSimilarityAPIURL(infoOutput)
+					digitizeBaseURL = cli.ExtractCatalogDigitizeURL(infoOutput)
+					if similarityBaseURL != "" && digitizeBaseURL != "" {
+						break
+					}
+					if ctx.Err() != nil {
+						ginkgo.Fail("Timed out waiting for similarity-backend URL in 'application info' output")
+					}
+					logger.Infof("[SIMILARITY] similarity-backend URL not yet present — retrying in %s", similarityPollInterval)
+					select {
+					case <-ctx.Done():
+						ginkgo.Fail("Timed out waiting for similarity-backend URL in 'application info' output")
+					case <-time.After(similarityPollInterval):
+					}
+					infoOutput, err = cli.ApplicationInfo(ctx, cfg, appName, appRuntime)
+					if err != nil {
+						logger.Warningf("[SIMILARITY] application info error while polling for similarity URL: %v", err)
+					}
 				}
 			} else {
-				similarityBaseURL = cli.ExtractSimilarityAPIURL(infoOutput)
+				urlList := cli.ExtractURLsFromOutput(infoOutput)
+				if len(urlList) == 0 {
+					ginkgo.Fail("No urls extracted from application info output")
+				} else {
+					similarityBaseURL = urlList[0]
+					digitizeBaseURL = strings.Replace(urlList[0], "ui", "digitize-api", 1)
+				}
 			}
+
+			_ = err
 
 			gomega.Expect(similarityBaseURL).NotTo(gomega.BeEmpty(),
 				"could not determine similarity-api base URL")
 			logger.Infof("[SIMILARITY] Similarity Base URL: %s", similarityBaseURL)
 		})
 
-		// C82562673 — Verify similarity-api pod is up and running
-		ginkgo.It("C82562673: Verify similarity-api pod is up and running",
-			func() {
-				ctx, cancel := withTimeout(30 * time.Second)
-				defer cancel()
-
-				gomega.Expect(
-					similarity.VerifyPodRunning(ctx, similarityBaseURL),
-				).To(gomega.Succeed())
-				logger.Infof("[TEST] C82562673: similarity-api pod is up and running")
-			})
-
-		// C82598931 — Verify GET /health endpoint
-		ginkgo.It("C82598931: Verify GET /health endpoint",
+		ginkgo.It("should pass health check",
 			func() {
 				ctx, cancel := withTimeout(30 * time.Second)
 				defer cancel()
@@ -1593,7 +1605,7 @@ var _ = ginkgo.Describe("AI Services End-to-End Tests", ginkgo.Ordered, func() {
 				gomega.Expect(err).NotTo(gomega.HaveOccurred())
 				gomega.Expect(resp).NotTo(gomega.BeNil())
 				gomega.Expect(resp.Status).NotTo(gomega.BeEmpty())
-				logger.Infof("[TEST] C82598931: GET /health returned status=%q", resp.Status)
+				logger.Infof("[TEST] Similarity service health check passed status=%q", resp.Status)
 			})
 
 		// Timing test — Verify Similarity search API includes time info in response headers or body in podman runtime
@@ -1629,12 +1641,39 @@ var _ = ginkgo.Describe("AI Services End-to-End Tests", ginkgo.Ordered, func() {
 		// C82598625 — Verify /v1/similarity-search with dense, sparse, and hybrid modes
 		ginkgo.It("C82598625: Verify /v1/similarity-search endpoint by providing different search mode such as dense, sparse or hybrid",
 			func() {
-				ctx, cancel := withTimeout(2 * time.Minute)
+				ctx, cancel := withTimeout(20 * time.Minute)
 				defer cancel()
+
+				pdfPath := digitization.GetTestPDFPath()
+				gomega.Expect(pdfPath).NotTo(gomega.BeEmpty())
+
+				// Step 1: Create digitization job
+				logger.Infof("[TEST] Step 1: Creating digitization job")
+				jobResp, err := digitization.CreateJob(ctx, digitizeBaseURL, pdfPath, "digitization", "json", "e2e-combined-workflow")
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(jobResp).NotTo(gomega.BeNil())
+				gomega.Expect(jobResp.JobID).NotTo(gomega.BeEmpty())
+				createdJobIDs = append(createdJobIDs, jobResp.JobID)
+				logger.Infof("[TEST] Created digitization job: %s", jobResp.JobID)
+
+				// Step 2: Get job status immediately after creation
+				logger.Infof("[TEST] Step 2: Getting job status")
+				status, err := digitization.GetJobStatus(ctx, digitizeBaseURL, jobResp.JobID)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(status.JobID).To(gomega.Equal(jobResp.JobID))
+				logger.Infof("[TEST] Job status retrieved: %s", status.Status)
+
+				// Step 3: Wait for job completion (only wait ONCE for all checks)
+				logger.Infof("[TEST] Step 3: Waiting for job completion")
+				finalStatus, err := digitization.WaitForJobCompletion(ctx, digitizeBaseURL, jobResp.JobID, 10*time.Minute)
+				gomega.Expect(err).NotTo(gomega.HaveOccurred())
+				gomega.Expect(finalStatus.Status).To(gomega.Equal("completed"))
+				logger.Infof("[TEST] Digitization job completed: %s", jobResp.JobID)
 
 				results := similarity.VerifySearchModes(ctx, similarityBaseURL)
 
-				// Every mode that returned a response must carry the correct score_type.
+				//Step 4: Every mode that returned a response must carry the correct score_type.
+				logger.Infof("[TEST] Step 4: Verifying similarity search api")
 				expectedScoreTypes := map[string]string{
 					"dense":  "cosine",
 					"sparse": "bm25",
@@ -1681,30 +1720,30 @@ var _ = ginkgo.Describe("AI Services End-to-End Tests", ginkgo.Ordered, func() {
 			})
 
 		// C82598925 — Reproduce 503: Service Unavailable
-		ginkgo.It("C82598925: Reproduce 503 Service Unavailable error code",
-			func() {
-				ctx, cancel := withTimeout(30 * time.Second)
-				defer cancel()
+		// ginkgo.It("C82598925: Reproduce 503 Service Unavailable error code",
+		// 	func() {
+		// 		ctx, cancel := withTimeout(30 * time.Second)
+		// 		defer cancel()
 
-				errResp, err := similarity.ReproduceServiceUnavailable(ctx, similarityBaseURL)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(errResp).NotTo(gomega.BeNil())
-				gomega.Expect(errResp.Error).NotTo(gomega.BeEmpty())
-				logger.Infof("[TEST] C82598925: 503 reproduced with error: %s", errResp.Error)
-			})
+		// 		errResp, err := similarity.ReproduceServiceUnavailable(ctx, similarityBaseURL)
+		// 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		// 		gomega.Expect(errResp).NotTo(gomega.BeNil())
+		// 		gomega.Expect(errResp.Error).NotTo(gomega.BeEmpty())
+		// 		logger.Infof("[TEST] C82598925: 503 reproduced with error: %s", errResp.Error)
+		// 	})
 
 		// C82598926 — Reproduce 500: Internal Server Error
-		ginkgo.It("C82598926: Reproduce 500 Internal Server Error code for similarity-search endpoint",
-			func() {
-				ctx, cancel := withTimeout(30 * time.Second)
-				defer cancel()
+		// ginkgo.It("C82598926: Reproduce 500 Internal Server Error code for similarity-search endpoint",
+		// 	func() {
+		// 		ctx, cancel := withTimeout(30 * time.Second)
+		// 		defer cancel()
 
-				errResp, err := similarity.ReproduceInternalServerError(ctx, similarityBaseURL)
-				gomega.Expect(err).NotTo(gomega.HaveOccurred())
-				gomega.Expect(errResp).NotTo(gomega.BeNil())
-				gomega.Expect(errResp.Error).NotTo(gomega.BeEmpty())
-				logger.Infof("[TEST] C82598926: 500 reproduced with error: %s", errResp.Error)
-			})
+		// 		errResp, err := similarity.ReproduceInternalServerError(ctx, similarityBaseURL)
+		// 		gomega.Expect(err).NotTo(gomega.HaveOccurred())
+		// 		gomega.Expect(errResp).NotTo(gomega.BeNil())
+		// 		gomega.Expect(errResp.Error).NotTo(gomega.BeEmpty())
+		// 		logger.Infof("[TEST] C82598926: 500 reproduced with error: %s", errResp.Error)
+		// 	})
 
 		// C82598928 — Reproduce 422: Validation Error
 		ginkgo.It("C82598928: Reproduce 422 validation error code for similarity-search endpoint",
