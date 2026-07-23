@@ -1604,7 +1604,7 @@ var _ = ginkgo.Describe("AI Services End-to-End Tests", ginkgo.Ordered, func() {
 				logger.Infof("[TEST] Similarity service health check passed status=%q", resp.Status)
 			})
 		
-			// Timing test — Verify Similarity search API includes time info in response headers or body in podman runtime
+		// Timing test — Verify Similarity search API includes time info in response headers or body in podman runtime
 		ginkgo.It("Verify Similarity search API includes time info in response headers or body in podman runtime",
 			func() {
 				if appRuntime != "podman" {
