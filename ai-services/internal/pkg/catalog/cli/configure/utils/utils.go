@@ -55,11 +55,11 @@ func WaitForDeploymentReady(ctx context.Context, rt *openshiftruntime.OpenshiftC
 				return fmt.Errorf("failed to get deployment status: %w", err)
 			}
 
-			logger.InfofCtx(ctx, "Deployment '%s': %d/%d replicas ready",
+			logger.DebugfCtx(ctx, "Deployment '%s': %d/%d replicas ready",
 				name, status.ReadyReplicas, status.DesiredReplicas)
 
 			if status.DesiredReplicas > 0 && status.ReadyReplicas == status.DesiredReplicas {
-				logger.InfofCtx(ctx, "Deployment '%s' is ready", name)
+				logger.InfofCtx(ctx, "\nDeployment '%s' is ready", name)
 
 				return nil
 			}
