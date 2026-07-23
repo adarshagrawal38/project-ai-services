@@ -44,6 +44,7 @@ type Runtime interface {
 
 	// Deployment operations
 	RolloutRestartDeployment(name string) error
+	GetDeploymentStatus(name string) (*types.DeploymentStatus, error)
 
 	// PVC operations
 	DeletePVCs(appLabel string) error

@@ -384,6 +384,12 @@ func (pc *PodmanClient) RolloutRestartDeployment(name string) error {
 	return fmt.Errorf("unsupported method")
 }
 
+func (pc *PodmanClient) GetDeploymentStatus(name string) (*types.DeploymentStatus, error) {
+	logger.ErrorfCtx(pc.Context, "unsupported method called!")
+
+	return nil, fmt.Errorf("unsupported method")
+}
+
 func (pc *PodmanClient) DeletePVCs(appLabel string) error {
 	logger.Errorf("unsupported method called!")
 

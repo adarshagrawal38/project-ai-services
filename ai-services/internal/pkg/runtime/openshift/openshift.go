@@ -500,6 +500,29 @@ func (kc *OpenshiftClient) GetPodResources(nameOrID string) (*types.PodResources
 	}, nil
 }
 
+// GetDeploymentStatus returns the observed replica counts for the named deployment.
+func (kc *OpenshiftClient) GetDeploymentStatus(name string) (*types.DeploymentStatus, error) {
+	deployment, err := kc.KubeClient.AppsV1().Deployments(kc.Namespace).Get(kc.Ctx, name, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get deployment %q: %w", name, err)
+	}
+
+	s := deployment.Status
+
+	desired := int32(0)
+	if deployment.Spec.Replicas != nil {
+		desired = *deployment.Spec.Replicas
+	}
+
+	return &types.DeploymentStatus{
+		DesiredReplicas:     desired,
+		ReadyReplicas:       s.ReadyReplicas,
+		AvailableReplicas:   s.AvailableReplicas,
+		UpdatedReplicas:     s.UpdatedReplicas,
+		UnavailableReplicas: s.UnavailableReplicas,
+	}, nil
+}
+
 // RolloutRestartDeployment triggers a rollout restart for the named deployment by
 // patching the pod template annotation "kubectl.kubernetes.io/restartedAt", which is
 // the same mechanism used by `kubectl rollout restart deployment <name>`.
