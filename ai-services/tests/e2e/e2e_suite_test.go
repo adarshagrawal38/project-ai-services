@@ -1607,10 +1607,6 @@ var _ = ginkgo.Describe("AI Services End-to-End Tests", ginkgo.Ordered, func() {
 		// Timing test — Verify Similarity search API includes time info in response headers or body in podman runtime
 		ginkgo.It("Verify Similarity search API includes time info in response headers or body in podman runtime",
 			func() {
-				if appRuntime != "podman" {
-					ginkgo.Skip("Timing header check is only applicable to podman runtime")
-				}
-
 				ctx, cancel := withTimeout(30 * time.Second)
 				defer cancel()
 

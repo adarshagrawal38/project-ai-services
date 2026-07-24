@@ -283,7 +283,7 @@ func VerifyHealthEndpoint(ctx context.Context, baseURL string) (*HealthResponse,
 // Corresponds to test case "Verify Similarity search API includes time info in response headers or body in podman runtime".
 func VerifyTimeInfoInResponse(ctx context.Context, baseURL string) error {
 	req := SimilaritySearchRequest{
-		Query: "test query for timing verification",
+		Query: "what is network configuration",
 		Mode:  "dense",
 	}
 
