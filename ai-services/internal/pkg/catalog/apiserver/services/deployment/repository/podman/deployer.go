@@ -20,7 +20,6 @@ import (
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/db/repository"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/types"
 	catalogutils "github.com/project-ai-services/ai-services/internal/pkg/catalog/utils"
-	"github.com/project-ai-services/ai-services/internal/pkg/cli/helpers"
 	clipodman "github.com/project-ai-services/ai-services/internal/pkg/cli/podman"
 	"github.com/project-ai-services/ai-services/internal/pkg/cli/templates"
 	"github.com/project-ai-services/ai-services/internal/pkg/constants"
@@ -29,6 +28,8 @@ import (
 	podmodels "github.com/project-ai-services/ai-services/internal/pkg/models"
 	"github.com/project-ai-services/ai-services/internal/pkg/proxy"
 	"github.com/project-ai-services/ai-services/internal/pkg/runtime"
+	remoteruntime "github.com/project-ai-services/ai-services/internal/pkg/runtime/remote"
+	runtimetypes "github.com/project-ai-services/ai-services/internal/pkg/runtime/types"
 	"github.com/project-ai-services/ai-services/internal/pkg/specs"
 	"github.com/project-ai-services/ai-services/internal/pkg/utils"
 	"github.com/project-ai-services/ai-services/internal/pkg/vars"
@@ -216,15 +217,30 @@ func (d *PodmanDeployer) extractModelsFromParams(params map[string]any, modelSet
 	}
 }
 
-// downloadModels downloads all models in the provided set.
+// downloadModels downloads all models in the provided set using the deployer's
+// runtime. For a remote agent this dispatches RunEphemeralContainer over gRPC
+// so the download runs on the worker LPAR, not the control plane.
 func (d *PodmanDeployer) downloadModels(ctx context.Context, modelSet map[string]bool) error {
 	modelsPath := utils.GetModelsPath()
 
 	for modelName := range modelSet {
 		logger.InfofCtx(ctx, "Downloading model: %s\n", modelName)
 
-		if err := helpers.DownloadModelContainer(ctx, modelName, modelsPath); err != nil {
+		cmd := []string{"hf", "download", modelName, "--local-dir", fmt.Sprintf("/models/%s", modelName)}
+		mounts := []runtimetypes.BindMount{
+			{
+				Source:      modelsPath,
+				Destination: "/models",
+				Options:     []string{"Z"},
+			},
+		}
+
+		exitCode, err := d.runtime.RunEphemeralContainer(vars.ToolImage, cmd, mounts)
+		if err != nil {
 			return fmt.Errorf("failed to download model %s: %w", modelName, err)
+		}
+		if exitCode != 0 {
+			return fmt.Errorf("model download for %s failed with exit code %d", modelName, exitCode)
 		}
 	}
 
@@ -1074,7 +1090,7 @@ func (d *PodmanDeployer) getEnvParamsForComponent(ctx context.Context, podSpec *
 func (d *PodmanDeployer) registerApplicationRoutes(ctx context.Context, plan *DeploymentPlan) error {
 	logger.InfofCtx(ctx, "Registering routes for application '%s'\n", plan.ApplicationName)
 
-	domainSuffix, httpsPort, proxyManager, err := d.getCaddyConfiguration()
+	domainSuffix, httpsPort, proxyManager, err := d.getCaddyConfiguration(ctx)
 	if err != nil {
 		return err
 	}
@@ -1100,8 +1116,16 @@ func (d *PodmanDeployer) registerApplicationRoutes(ctx context.Context, plan *De
 	return nil
 }
 
-// getCaddyConfiguration retrieves Caddy configuration and creates a ProxyManager.
-func (d *PodmanDeployer) getCaddyConfiguration() (string, string, proxy.ProxyManager, error) {
+// getCaddyConfiguration retrieves Caddy configuration and a ProxyManager.
+//
+// For local Podman deployments the ProxyManager connects to the control plane's
+// own Caddy instance via CADDY_ADMIN_URL (existing behaviour).
+//
+// For remote-agent deployments, the ProxyManager wraps the runtime's
+// proxy methods so that route registration commands are sent over the gRPC
+// stream directly to the worker's Caddy instance — no CADDY_ADMIN_URL needed
+// on the control plane for remote workers.
+func (d *PodmanDeployer) getCaddyConfiguration(ctx context.Context) (string, string, proxy.ProxyManager, error) {
 	// Get domain suffix from env var (set during catalog configure)
 	// This is pre-computed: certDomain OR customDomain OR hostIP.nip.io
 	domainSuffix := utils.GetEnv("DOMAIN_SUFFIX", "")
@@ -1111,13 +1135,35 @@ func (d *PodmanDeployer) getCaddyConfiguration() (string, string, proxy.ProxyMan
 
 	httpsPort := utils.GetEnv("CADDY_HTTPS_PORT", catalogconstants.DefaultHTTPSPort)
 
-	// Get Caddy proxy manager - fails if CADDY_ADMIN_URL not set
-	proxyManager, err := proxy.GetCaddyProxyManager()
-	if err != nil {
-		return "", "", nil, err
+	rt := d.runtime
+	switch rt.Type() {
+	case runtimetypes.RuntimeTypeRemotePodman, runtimetypes.RuntimeTypeRemoteOpenShift:
+		// For remote agents, routes are registered on the worker's own Caddy.
+		// The domain suffix must be the worker's — not the control-plane's DOMAIN_SUFFIX.
+		// Priority: domain suffix sent by worker at start-up > worker peer IP.nip.io.
+		rrt, ok := rt.(*remoteruntime.RemoteRuntime)
+		if !ok {
+			return "", "", nil, fmt.Errorf("getCaddyConfiguration: expected *RemoteRuntime for remote type")
+		}
+		workerDomainSuffix := rrt.DomainSuffix()
+		if workerDomainSuffix == "" {
+			// Fall back to deriving nip.io suffix from the observed peer IP.
+			workerIP := rrt.WorkerIP()
+			if workerIP == "" {
+				return "", "", nil, fmt.Errorf("getCaddyConfiguration: worker domain suffix not known for agent (run 'agent start' again?)")
+			}
+			workerDomainSuffix = fmt.Sprintf("%s.nip.io", strings.ReplaceAll(workerIP, ".", "-"))
+		}
+		logger.InfofCtx(ctx, "getCaddyConfiguration: remote agent — using worker domain suffix %s\n", workerDomainSuffix)
+		return workerDomainSuffix, httpsPort, proxy.NewRuntimeProxyManager(ctx, rt), nil
+	default:
+		// Local Podman: use the control-plane Caddy via CADDY_ADMIN_URL.
+		proxyManager, err := proxy.GetCaddyProxyManager()
+		if err != nil {
+			return "", "", nil, err
+		}
+		return domainSuffix, httpsPort, proxyManager, nil
 	}
-
-	return domainSuffix, httpsPort, proxyManager, nil
 }
 
 // registerServiceRoutes registers routes for a single service and updates its endpoints in the database.

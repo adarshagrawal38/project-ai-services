@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/project-ai-services/ai-services/docs" // Import generated docs
+	"github.com/project-ai-services/ai-services/internal/pkg/agent/registry"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/apiserver/handlers"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/apiserver/middleware"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/apiserver/repository"
@@ -16,7 +17,11 @@ import (
 )
 
 // CreateRouter sets up the Gin router with the necessary routes and authentication middleware for the API server.
+<<<<<<< ours
 func CreateRouter(authSvc auth.Service, tokenMgr *auth.TokenManager, blacklist repository.TokenBlacklist, appService repository.ApplicationServiceInterface, workerReg *registry.Registry) *gin.Engine {
+=======
+func CreateRouter(authSvc auth.Service, tokenMgr *auth.TokenManager, blacklist repository.TokenBlacklist, appService *repository.ApplicationService, agentTokenStore *registry.TokenStore, agentReg *registry.Registry) *gin.Engine {
+>>>>>>> theirs
 	if mode := os.Getenv("GIN_MODE"); mode != "" {
 		gin.SetMode(mode)
 	}
@@ -30,6 +35,15 @@ func CreateRouter(authSvc auth.Service, tokenMgr *auth.TokenManager, blacklist r
 	router.GET("/health", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"message": "ok"}) })
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
+<<<<<<< ours
+=======
+	authHandler := handlers.NewAuthHandler(authSvc)
+	catalogHandler := handlers.NewCatalogHandler()
+	resourcesHandler := handlers.NewResourcesHandler()
+	applicationHandler := handlers.NewApplicationHandler(appService)
+	agentHandler := handlers.NewAgentHandler(agentTokenStore, agentReg)
+
+>>>>>>> theirs
 	v1 := router.Group("/api/v1")
 	registerAuthRoutes(v1, handlers.NewAuthHandler(authSvc), tokenMgr, blacklist)
 
@@ -90,4 +104,19 @@ func registerWorkerRoutes(v1 *gin.RouterGroup, h *handlers.WorkerHandler, authMw
 		g.GET("", h.ListWorkers)
 		g.DELETE("/:id", h.DeleteWorker)
 	}
+<<<<<<< ours
+=======
+
+	// Agent management endpoints (only functional when --agentgateway-port is set)
+	agents := v1.Group("agents")
+	agents.Use(middleware.AuthMiddleware(tokenMgr, blacklist))
+	{
+		agents.GET("", agentHandler.ListAgents)
+		agents.GET("/:agent_name", agentHandler.GetAgent)
+		agents.POST("/tokens", agentHandler.IssueToken)
+		agents.DELETE("/:agent_name", agentHandler.DeleteAgent)
+	}
+
+	return router
+>>>>>>> theirs
 }

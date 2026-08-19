@@ -39,8 +39,15 @@ var (
 	sslKeyPath  string
 	// HTTPS port flag for catalog configure command.
 	httpsPort int
+<<<<<<< ours
 	// WorkerGateway port — always active, defaults to 9090.
 	workerGatewayPort int
+=======
+	// AgentGateway port — 0 means disabled.
+	agentGatewayPort int
+	// Reset password flag for catalog configure command.
+	resetPasswordFlag bool
+>>>>>>> theirs
 	// Reset podman auth secret for catalog configure command.
 	resetPodmanAuthFlag bool
 	// Reset certificate flag for catalog configure command.
@@ -60,11 +67,10 @@ var configureCmd = &cobra.Command{
 	Short: "Configure the catalog service",
 	Long: `Configure and deploy the AI Services catalog service with the specified runtime.
 
-This command performs the following operations:
-  - Deploys the catalog services
-  - Creates an admin user (if not already present)
-  - Initializes directory structure for applications and models
+This command deploys the catalog pod, creates an admin user, and initialises
+directory structure for applications and models.
 
+<<<<<<< ours
 Use --workergateway-port to set the gRPC port that workers connect to (default 9090).
 The worker gateway is always started; only the port number is configurable.
 
@@ -72,6 +78,48 @@ Additional configuration options include base directory customization, domain na
 SSL/TLS certificate management, HTTPS port configuration, and credential/certificate reset capabilities.`,
 	Example: `  # Configure catalog service for podman (worker gateway on default port 9090)
 	 ai-services catalog configure --runtime podman
+=======
+Use --agentgateway-port to also start the gRPC AgentGateway so that Worker
+LPARs can connect and receive Podman runtime commands.
+
+Additional configuration options include base directory customisation, domain
+name setup, SSL/TLS certificate management, HTTPS port configuration, and
+credential/certificate reset capabilities.`,
+		Example: `  # Deploy catalog pod (REST API only)
+  ai-services catalog configure --runtime podman
+
+  # Deploy catalog pod with AgentGateway on port 9090
+  ai-services catalog configure --runtime podman --agentgateway-port 9090
+
+  # Configure with custom HTTPS port
+  ai-services catalog configure --runtime podman --https-port 8443`,
+		Args: cobra.NoArgs,
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			cmd.SilenceUsage = true
+
+			if resetPasswordFlag {
+				return validateResetFlag(cmd, "reset-password")
+			} else if resetPodmanAuthFlag {
+				return validateResetFlag(cmd, "reset-podman-auth")
+			} else if resetCertificateFlag {
+				return validateResetCertificateFlags(cmd, "reset-certificate")
+			}
+
+			return validateConfigureFlags()
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if resetPasswordFlag {
+				return runResetPassword()
+			} else if resetPodmanAuthFlag {
+				return runResetPodmanAuth()
+			} else if resetCertificateFlag {
+				return runResetCertificate()
+			}
+
+			return runConfigure()
+		},
+	}
+>>>>>>> theirs
 
 	 # Configure with a custom worker gateway port
 	 ai-services catalog configure --runtime podman --workergateway-port 9191
@@ -178,7 +226,14 @@ func resolveBaseDir(baseDir string) (string, error) {
 		return "", fmt.Errorf("invalid base directory '%s': %w", baseDir, err)
 	}
 
+<<<<<<< ours
 	return resolved, nil
+=======
+	// Sanitize SSL certificate paths to prevent path traversal attacks
+	cleanCertPath, cleanKeyPath := sanitizeSSLPaths(sslCertPath, sslKeyPath)
+
+	return configure.Run(vars.RuntimeFactory.GetRuntimeType(), aiServicesDir, domainName, cleanCertPath, cleanKeyPath, httpsPort, agentGatewayPort)
+>>>>>>> theirs
 }
 
 func validateResetFlag(cmd *cobra.Command, flagName string) error {
@@ -215,6 +270,11 @@ func validateConfigureFlags() error {
 		if workerGatewayPort < 1 || workerGatewayPort > 65535 {
 			return fmt.Errorf("invalid workergateway-port %d: must be between 1 and 65535", workerGatewayPort)
 		}
+	}
+
+	// Validate agentgateway-port range when explicitly set
+	if agentGatewayPort != 0 && (agentGatewayPort < 1 || agentGatewayPort > 65535) {
+		return fmt.Errorf("invalid agentgateway-port %d: must be between 1 and 65535", agentGatewayPort)
 	}
 
 	return nil
@@ -323,8 +383,23 @@ func initConfigurePodmanFlags() {
 	initConfigurePodmanResetFlags()
 }
 
+<<<<<<< ours
 func initConfigurePodmanDeployFlags() {
 	configureCmd.Flags().StringVar(
+=======
+	// AgentGateway port — non-zero enables the gRPC AgentGateway.
+	cmd.Flags().IntVar(
+		&agentGatewayPort,
+		"agentgateway-port",
+		0,
+		"Port for the gRPC AgentGateway that worker agents connect to (0 = disabled).\n"+
+			"When set, the catalog pod's backend container starts the AgentGateway on this port.\n"+
+			"Example: --agentgateway-port 9090\n",
+	)
+
+	// Add basedir flag
+	cmd.Flags().StringVar(
+>>>>>>> theirs
 		&baseDir,
 		"basedir",
 		"",
@@ -458,5 +533,3 @@ func initConfigureOpenShiftFlags() {
 			"Example: --timeout 30m\n",
 	)
 }
-
-// Made with Bob

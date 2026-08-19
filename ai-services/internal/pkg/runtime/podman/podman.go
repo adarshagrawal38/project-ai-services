@@ -1,10 +1,14 @@
 package podman
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -22,6 +26,7 @@ import (
 	"github.com/containers/podman/v5/pkg/bindings/volumes"
 	"github.com/containers/podman/v5/pkg/domain/entities"
 	"github.com/containers/podman/v5/pkg/specgen"
+	spec "github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/project-ai-services/ai-services/internal/pkg/accelerator/spyre"
 	"github.com/project-ai-services/ai-services/internal/pkg/constants"
 	"github.com/project-ai-services/ai-services/internal/pkg/logger"
@@ -36,8 +41,20 @@ const (
 	execCommandFixedArgsCount = 2 // "exec" and containerID
 )
 
+// LocalCaddyManager is a narrow interface for managing Caddy routes on the
+// local worker node.  It is injected into PodmanClient so that the
+// podman package does not need to import the proxy package (which would cause
+// an import cycle via cli/templates → vars → runtime).
+type LocalCaddyManager interface {
+	RegisterRoute(ctx context.Context, id, domain, upstream string, terminal bool, routeType string) error
+	UnregisterRoute(routeID string) error
+	GetRoute(routeID string) (*types.ProxyRoute, error)
+	HealthCheck() error
+}
+
 type PodmanClient struct {
-	Context context.Context
+	Context  context.Context
+	caddyMgr LocalCaddyManager // nil until SetCaddyManager is called
 }
 
 // NewPodmanClient creates and returns a new PodmanClient instance.
@@ -422,7 +439,34 @@ func (pc *PodmanClient) RunContainerWithSpec(ctx context.Context, s *specgen.Spe
 	}
 }
 
+<<<<<<< ours
 func (pc *PodmanClient) ListRoutes(_ string) ([]types.Route, error) {
+=======
+// RunEphemeralContainer implements runtime.Runtime.
+// It creates a one-shot container from image, runs cmd with the given bind
+// mounts, waits for it to exit, and returns the exit code.
+func (pc *PodmanClient) RunEphemeralContainer(image string, cmd []string, mounts []types.BindMount) (int32, error) {
+	s := specgen.NewSpecGenerator(image, false)
+	rm := true
+	s.Remove = &rm
+	s.Command = cmd
+
+	specMounts := make([]spec.Mount, 0, len(mounts))
+	for _, m := range mounts {
+		specMounts = append(specMounts, spec.Mount{
+			Type:        "bind",
+			Source:      m.Source,
+			Destination: m.Destination,
+			Options:     m.Options,
+		})
+	}
+	s.Mounts = specMounts
+
+	return pc.RunContainerWithSpec(s)
+}
+
+func (pc *PodmanClient) ListRoutes() ([]types.Route, error) {
+>>>>>>> theirs
 	logger.Errorf("unsupported method called!")
 
 	return nil, fmt.Errorf("unsupported method")
@@ -582,6 +626,7 @@ func getAcceleratorInfo(ctx context.Context) map[string]*models.AcceleratorInfo 
 	accelerators[constants.SpyreResourceName] = &models.AcceleratorInfo{
 		Total:     totalCount,
 		Available: availableCount,
+		FreeAddresses: availableCards,
 	}
 
 	return accelerators
@@ -809,9 +854,182 @@ func (pc *PodmanClient) ManageSidecarLifecycle(podID, sidecarName, image string,
 	return executor(pc.Context, containerID)
 }
 
+<<<<<<< ours
 // ExecInContainerWithCmd is not implemented for the Podman runtime.
 func (pc *PodmanClient) ExecInContainerWithCmd(_, _ string, _ []string) (string, error) {
 	logger.Errorf("unsupported method called!")
 
 	return "", fmt.Errorf("unsupported method")
+=======
+// ──────────────────────────────────────────────────────────────────────────────
+// HTTP proxy tunnel
+// The worker executes the HTTP request locally and returns the response.
+// ──────────────────────────────────────────────────────────────────────────────
+
+// HTTPProxy makes an HTTP request to targetURL from the worker node and returns
+// the response to the control plane.  This implements the path: the
+// control plane issues a COMMAND_TYPE_HTTP_PROXY over the gRPC stream; the
+// daemon calls this method so the request executes against a local pod endpoint.
+//
+// The targetURL hostname may be a Podman pod name (e.g. "my-app--chat-bot").
+// Pod name DNS resolution only works inside Podman-networked containers, not
+// from the host OS.  So if the hostname is not already an IP address we
+// resolve it to the pod's infra-container IP before making the request.
+func (pc *PodmanClient) HTTPProxy(ctx context.Context, method, targetURL string, headers map[string]string, body []byte) (*types.HTTPProxyResponse, error) {
+	resolvedURL, err := pc.resolvePodNameInURL(targetURL)
+	if err != nil {
+		return nil, fmt.Errorf("HTTPProxy: resolve pod IP: %w", err)
+	}
+
+	var reqBody io.Reader
+	if len(body) > 0 {
+		reqBody = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, resolvedURL, reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("HTTPProxy: build request: %w", err)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("HTTPProxy: execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("HTTPProxy: read response body: %w", err)
+	}
+
+	respHeaders := make(map[string]string, len(resp.Header))
+	for k := range resp.Header {
+		respHeaders[k] = resp.Header.Get(k)
+	}
+
+	return &types.HTTPProxyResponse{
+		StatusCode: resp.StatusCode,
+		Headers:    respHeaders,
+		Body:       respBody,
+	}, nil
+}
+
+// resolvePodNameInURL rewrites the hostname in rawURL from a Podman pod name
+// to the pod's IP address.  Pod name DNS is only available inside Podman
+// network namespaces; the host OS resolver cannot use it.
+//
+// If the hostname is already an IP address (or localhost) it is returned
+// unchanged.
+func (pc *PodmanClient) resolvePodNameInURL(rawURL string) (string, error) {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return "", fmt.Errorf("parse URL %q: %w", rawURL, err)
+	}
+
+	host := u.Hostname() // strips port if present
+
+	// Already an IP or localhost — nothing to do.
+	if host == "localhost" || net.ParseIP(host) != nil {
+		return rawURL, nil
+	}
+
+	// Treat the hostname as a pod name and resolve it to the pod's IP.
+	podIP, err := pc.podNameToIP(host)
+	if err != nil {
+		return "", fmt.Errorf("resolve pod %q to IP: %w", host, err)
+	}
+
+	// Rebuild the URL with the IP in place of the pod name.
+	if port := u.Port(); port != "" {
+		u.Host = net.JoinHostPort(podIP, port)
+	} else {
+		u.Host = podIP
+	}
+
+	return u.String(), nil
+}
+
+// podNameToIP inspects the named pod and returns its infra-container IP address.
+func (pc *PodmanClient) podNameToIP(podName string) (string, error) {
+	podReport, err := pods.Inspect(pc.Context, podName, nil)
+	if err != nil {
+		return "", fmt.Errorf("inspect pod %q: %w", podName, err)
+	}
+
+	infraID := podReport.InfraContainerID
+	if infraID == "" {
+		return "", fmt.Errorf("pod %q has no infra container", podName)
+	}
+
+	ctr, err := containers.Inspect(pc.Context, infraID, nil)
+	if err != nil {
+		return "", fmt.Errorf("inspect infra container of pod %q: %w", podName, err)
+	}
+
+	if ctr.NetworkSettings == nil {
+		return "", fmt.Errorf("pod %q infra container has no network settings", podName)
+	}
+
+	ip := ctr.NetworkSettings.IPAddress
+	if ip == "" {
+		// Fall back to the first network if the top-level IPAddress is empty
+		// (common in rootless Podman with named networks).
+		for _, net := range ctr.NetworkSettings.Networks {
+			if net.IPAddress != "" {
+				return net.IPAddress, nil
+			}
+		}
+		return "", fmt.Errorf("pod %q: no IP address found in network settings", podName)
+	}
+
+	return ip, nil
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Proxy operations – Caddy management on the local worker node
+// ──────────────────────────────────────────────────────────────────────────────
+
+// SetCaddyManager injects a LocalCaddyManager so the Podman runtime can
+// manage the worker's Caddy instance without importing the proxy
+// package (which would cause an import cycle).
+// Call this once after constructing PodmanClient, e.g. from the daemon or
+// the agent start command where the proxy package is already in scope.
+func (pc *PodmanClient) SetCaddyManager(mgr LocalCaddyManager) {
+	pc.caddyMgr = mgr
+}
+
+// RegisterProxyRoute registers a route with the local Caddy instance.
+func (pc *PodmanClient) RegisterProxyRoute(ctx context.Context, route types.ProxyRoute) error {
+	if pc.caddyMgr == nil {
+		return fmt.Errorf("RegisterProxyRoute: Caddy manager not configured (call SetCaddyManager)")
+	}
+	return pc.caddyMgr.RegisterRoute(ctx, route.ID, route.Domain, route.Upstream, route.Terminal, route.Type)
+}
+
+// UnregisterProxyRoute removes a route from the local Caddy instance.
+func (pc *PodmanClient) UnregisterProxyRoute(routeID string) error {
+	if pc.caddyMgr == nil {
+		return fmt.Errorf("UnregisterProxyRoute: Caddy manager not configured (call SetCaddyManager)")
+	}
+	return pc.caddyMgr.UnregisterRoute(routeID)
+}
+
+// GetProxyRoute retrieves a route by ID from the local Caddy instance.
+func (pc *PodmanClient) GetProxyRoute(routeID string) (*types.ProxyRoute, error) {
+	if pc.caddyMgr == nil {
+		return nil, fmt.Errorf("GetProxyRoute: Caddy manager not configured (call SetCaddyManager)")
+	}
+	return pc.caddyMgr.GetRoute(routeID)
+}
+
+// ProxyHealthCheck verifies the local Caddy instance is reachable.
+func (pc *PodmanClient) ProxyHealthCheck() error {
+	if pc.caddyMgr == nil {
+		return fmt.Errorf("ProxyHealthCheck: Caddy manager not configured (call SetCaddyManager)")
+	}
+	return pc.caddyMgr.HealthCheck()
+>>>>>>> theirs
 }

@@ -11,6 +11,9 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/project-ai-services/ai-services/cmd/ai-services/cmd/catalog/common"
+	agentdispatcher "github.com/project-ai-services/ai-services/internal/pkg/agent/dispatcher"
+	"github.com/project-ai-services/ai-services/internal/pkg/agent/gateway"
+	"github.com/project-ai-services/ai-services/internal/pkg/agent/registry"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/apiserver"
 	apirepository "github.com/project-ai-services/ai-services/internal/pkg/catalog/apiserver/repository"
@@ -129,7 +132,11 @@ func buildAPIServerOptions(ctx context.Context, pool *pgxpool.Pool, secretKey, a
 }
 
 // runAPIServer initializes and starts the API server with the provided configuration.
+<<<<<<< ours
 func runAPIServer(port int, accessTTL, refreshTTL time.Duration, adminUser, adminPassHash string, workerGatewayPort int, manageiqURL string, manageiqInsecure bool) error {
+=======
+func runAPIServer(port int, accessTTL, refreshTTL time.Duration, adminUser, adminPassHash string, agentGatewayPort int) error {
+>>>>>>> theirs
 	secretKey, err := getOrGenerateSecretKey()
 	if err != nil {
 		return err
@@ -152,15 +159,83 @@ func runAPIServer(port int, accessTTL, refreshTTL time.Duration, adminUser, admi
 	defer pool.Close()
 	logger.Infoln("Connected to database successfully")
 
+<<<<<<< ours
 	opts, cleanup, err := buildAPIServerOptions(ctx, pool, secretKey, adminUser, adminPassHash, accessTTL, refreshTTL, workerGatewayPort, manageiqURL, manageiqInsecure)
+=======
+	userRepo := apirepository.NewInMemoryUserRepoWithAdminHash("uid_1", adminUser, "Admin", adminPassHash)
+	tokenBlacklistRepo := repository.NewTokenBlacklistRepository(pool)
+	blacklist := apirepository.NewDBTokenBlacklist(tokenBlacklistRepo)
+	defer blacklist.Stop()
+
+	// Initialize repositories
+	applicationRepo := repository.NewApplicationRepository(pool)
+	serviceRepo := repository.NewServiceRepository(pool)
+	componentRepo := repository.NewComponentRepository(pool)
+	serviceDependencyRepo := repository.NewServiceDependencyRepository(pool)
+
+	// Initialize sync service for background DB-Pod synchronization.
+	// Sync is disabled when the AgentGateway is enabled because pods live on
+	// remote worker LPARs — the control-plane Podman socket cannot reach them,
+	// so polling would mark every remote-deployed application as Error.
+	if agentGatewayPort == 0 {
+		syncService, err := sync.NewSyncService(
+			applicationRepo,
+			serviceRepo,
+			componentRepo,
+			serviceDependencyRepo,
+			sync.DefaultSyncInterval,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to initialize sync service: %w", err)
+		}
+		syncService.Start(ctx)
+		defer syncService.Stop(ctx)
+	}
+
+	catalogProvider, err := catalog.NewCatalogProvider()
+>>>>>>> theirs
 	if err != nil {
 		return err
 	}
 	defer cleanup()
 
+<<<<<<< ours
 	opts.Port = port
 
 	return apiserver.NewAPIserver(opts).Start(ctx)
+=======
+	// Build AgentDispatcher when the AgentGateway is requested.
+	// Both the dispatcher and the gateway share the same Registry instance.
+	var agentDispatcher *agentdispatcher.AgentDispatcher
+	opts := apiserver.APIServerOptions{
+		Port:    port,
+		Blacklist: blacklist,
+	}
+	if agentGatewayPort > 0 {
+		reg := registry.New(pool)
+		ts := registry.NewTokenStore()
+		agentDispatcher = agentdispatcher.New(reg)
+		opts.AgentGateway = gateway.New(reg, ts)
+		opts.AgentGatewayPort = agentGatewayPort
+		opts.AgentTokenStore = ts
+		opts.AgentRegistry = reg
+		logger.Infof("AgentGateway enabled on port %d", agentGatewayPort)
+	}
+
+	// Initialize application service with all required repositories.
+	// agentDispatcher is nil when AgentGateway is disabled — remote-podman
+	// deployments will return an error at execution time in that case.
+	applicationService := apirepository.NewApplicationService(applicationRepo, serviceRepo, componentRepo, serviceDependencyRepo, catalogProvider, agentDispatcher)
+
+	tokenMgr := auth.NewTokenManager(secretKey, accessTTL, refreshTTL)
+	authSvc := auth.NewAuthService(userRepo, tokenMgr, blacklist)
+
+	opts.AuthService = authSvc
+	opts.TokenManager = tokenMgr
+	opts.ApplicationService = applicationService
+
+	return apiserver.NewAPIserver(opts).Start()
+>>>>>>> theirs
 }
 
 func NewAPIServerCmd() *cobra.Command {
@@ -174,7 +249,11 @@ func NewAPIServerCmd() *cobra.Command {
 		manageiqURL            string
 		manageiqInsecure       bool
 		runtimeType            string
+<<<<<<< ours
 		workerGatewayPort      int
+=======
+		agentGatewayPort       int // 0 means disabled
+>>>>>>> theirs
 	)
 
 	apiserverCmd := &cobra.Command{
@@ -187,14 +266,8 @@ func NewAPIServerCmd() *cobra.Command {
 	 # Start the API server on a custom port
 	 ai-services catalog apiserver --port 9090 --admin-password-hash <PASSWORD_HASH> --runtime podman
 
-	 # Start with custom admin username
-	 ai-services catalog apiserver --admin-username myadmin --admin-password-hash <PASSWORD_HASH> --runtime podman
-
-	 # Start with custom token TTL settings
-	 ai-services catalog apiserver --access-token-ttl 30m --refresh-token-ttl 48h --admin-password-hash <PASSWORD_HASH> --runtime podman
-
-	 # Start with all custom settings
-	 ai-services catalog apiserver --port 9090 --admin-username myadmin --admin-password-hash <PASSWORD_HASH> --access-token-ttl 30m --refresh-token-ttl 48h --runtime podman
+	 # Start with AgentGateway enabled (for remote worker agents)
+	 ai-services catalog apiserver --admin-password-hash <PASSWORD_HASH> --runtime podman --agentgateway-port 9090
 
 Note:
   - Requires database connection via environment variables (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME)
@@ -203,7 +276,11 @@ Note:
 			return common.InitAndValidateRuntimeFlag(runtimeType)
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+<<<<<<< ours
 			return runAPIServer(port, defaultAccessTokenTTL, defaultRefreshTokenTTL, adminUserName, adminPasswordHash, workerGatewayPort, manageiqURL, manageiqInsecure)
+=======
+			return runAPIServer(port, defaultAccessTokenTTL, defaultRefreshTokenTTL, adminUserName, adminPasswordHash, agentGatewayPort)
+>>>>>>> theirs
 		},
 	}
 
@@ -212,12 +289,16 @@ Note:
 	apiserverCmd.Flags().DurationVarP(&defaultRefreshTokenTTL, "refresh-token-ttl", "", defaultRefreshTokenTTL, "Time-to-live for refresh tokens")
 	apiserverCmd.Flags().StringVar(&adminUserName, "admin-username", "admin", "Username for the default admin user")
 	apiserverCmd.Flags().StringVar(&adminPasswordHash, "admin-password-hash", "", "Precomputed hash of the password for the default admin user")
+<<<<<<< ours
 	apiserverCmd.Flags().IntVar(&workerGatewayPort, "workergateway-port", defaultWorkerGatewayPort, "Port for the gRPC worker gateway (always active, default 9090)")
 	apiserverCmd.Flags().StringVar(&manageiqURL, "manageiq-url", "", "ManageIQ base URL for AuthN/AuthZ, e.g. https://9.20.202.144:8443")
 	apiserverCmd.Flags().BoolVar(&manageiqInsecure, "manageiq-insecure-tls", false, "Skip TLS verification for ManageIQ (self-signed certs)")
 	// Hide the ManageIQ flags
 	_ = apiserverCmd.Flags().MarkHidden("manageiq-url")
 	_ = apiserverCmd.Flags().MarkHidden("manageiq-insecure-tls")
+=======
+	apiserverCmd.Flags().IntVar(&agentGatewayPort, "agentgateway-port", 0, "Port for the gRPC AgentGateway (0 = disabled, default 9090 when enabled)")
+>>>>>>> theirs
 	common.ConfigureRuntimeFlag(apiserverCmd, &runtimeType)
 
 	return apiserverCmd

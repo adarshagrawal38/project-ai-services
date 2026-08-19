@@ -11,7 +11,6 @@ import (
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/apiserver/services/params"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/db/repository"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/utils"
-	"github.com/project-ai-services/ai-services/internal/pkg/cli/helpers"
 	"github.com/project-ai-services/ai-services/internal/pkg/logger"
 	runtimeTypes "github.com/project-ai-services/ai-services/internal/pkg/runtime/types"
 )
@@ -73,6 +72,7 @@ func (p *DeploymentPlanner) PlanDeployment(
 		IsArchitecture:  isArchitecture,
 		Components:      make(map[string]*ComponentPlan),
 		Services:        make(map[string]*ServicePlan),
+		AgentSelector:   req.AgentSelector,
 	}
 
 	// Process each service from request
@@ -88,6 +88,7 @@ func (p *DeploymentPlanner) PlanDeployment(
 			return nil, fmt.Errorf("failed to allocate Spyre cards: %w", err)
 		}
 	}
+	plan.SpyreCardsRequired = required
 
 	return plan, nil
 }
@@ -195,50 +196,25 @@ func (p *DeploymentPlanner) processComponent(
 	return componentHash, nil
 }
 
-// calculateAndAllocateSpyreCards calculates required Spyre cards and creates allocation pool.
-func (p *DeploymentPlanner) calculateAndAllocateSpyreCards(ctx context.Context, plan *DeploymentPlan) error {
-	totalRequired := 0
-
-	// Calculate total required Spyre cards from all components
+// calculateRequiredSpyreCards returns the total number of Spyre cards required
+// across all components in the plan. Discovery of available cards is deferred
+// to the executor, which has access to the correct runtime (local or remote).
+func (p *DeploymentPlanner) calculateRequiredSpyreCards(ctx context.Context, plan *DeploymentPlan) (int, error) {
+	total := 0
 	for _, comp := range plan.Components {
 		required, err := p.getRequiredSpyreCardsForComponent(ctx, comp)
 		if err != nil {
-			return fmt.Errorf("failed to get Spyre card requirements for component %s: %w", comp.ComponentType, err)
+			return 0, fmt.Errorf("failed to get Spyre card requirements for component %s: %w", comp.ComponentType, err)
 		}
-		totalRequired += required
 		if required > 0 {
 			logger.InfofCtx(ctx, "Component %s/%s requires %d Spyre cards\n", comp.ComponentType, comp.ProviderID, required)
 		}
+		total += required
 	}
-
-	if totalRequired == 0 {
-		logger.InfofCtx(ctx, "No Spyre cards required for this deployment\n")
-
-		return nil
+	if total > 0 {
+		logger.InfofCtx(ctx, "Total Spyre cards required: %d\n", total)
 	}
-
-	logger.InfofCtx(ctx, "Total Spyre cards required: %d\n", totalRequired)
-
-	// Find available Spyre cards
-	pciAddresses, err := helpers.FindFreeSpyreCards(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to find free Spyre cards: %w", err)
-	}
-
-	availableCount := len(pciAddresses)
-	logger.InfofCtx(ctx, "Available Spyre cards: %d\n", availableCount)
-
-	// Validate we have enough Spyre cards
-	if availableCount < totalRequired {
-		return fmt.Errorf("insufficient Spyre cards: required %d, available %d", totalRequired, availableCount)
-	}
-
-	// Create pool with available addresses and store in plan
-	plan.SpyreCardPool = &types.SpyreCardPool{
-		Addresses: pciAddresses,
-	}
-
-	return nil
+	return total, nil
 }
 
 // getRequiredSpyreCardsForComponent calculates Spyre cards needed for a component.

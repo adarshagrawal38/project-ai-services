@@ -331,3 +331,78 @@ func jwtExpiry(token string) (time.Time, error) {
 }
 
 // Made with Bob
+
+// IssueAgentToken calls POST /api/v1/agents/tokens and returns the token string.
+// The token is not bound to an agent name; the name is provided by the agent
+// itself at registration time via `ai-services agent start --name`.
+func (c *Client) IssueAgentToken() (string, error) {
+	var resp struct {
+		Token string `json:"token"`
+		Note  string `json:"note"`
+	}
+	httpResp, err := c.httpClient.R().
+		SetResult(&resp).
+		Post("/api/v1/agents/tokens")
+	if err != nil {
+		return "", fmt.Errorf("issue agent token request: %w", err)
+	}
+	if httpResp.IsError() {
+		return "", fmt.Errorf("issue agent token failed: HTTP %d: %s", httpResp.StatusCode(), httpResp.String())
+	}
+	return resp.Token, nil
+}
+
+// DeleteAgent calls DELETE /api/v1/agents/:agent_name.
+func (c *Client) DeleteAgent(agentName string) error {
+	httpResp, err := c.httpClient.R().
+		Delete("/api/v1/agents/" + agentName)
+	if err != nil {
+		return fmt.Errorf("delete agent request: %w", err)
+	}
+	if httpResp.IsError() {
+		return fmt.Errorf("delete agent failed: HTTP %d: %s", httpResp.StatusCode(), httpResp.String())
+	}
+	return nil
+}
+
+// ListAgents calls GET /api/v1/agents and returns a slice of agent status maps.
+func (c *Client) ListAgents() ([]map[string]any, error) {
+	var resp struct {
+		Agents []map[string]any `json:"agents"`
+	}
+	httpResp, err := c.httpClient.R().
+		SetResult(&resp).
+		Get("/api/v1/agents")
+	if err != nil {
+		return nil, fmt.Errorf("list agents request: %w", err)
+	}
+	if httpResp.IsError() {
+		return nil, fmt.Errorf("list agents failed: HTTP %d: %s", httpResp.StatusCode(), httpResp.String())
+	}
+	return resp.Agents, nil
+}
+
+// AgentStatus is the response body from GET /api/v1/agents/:agent_name.
+type AgentStatus struct {
+	AgentName     string            `json:"agent_name"`
+	Status        string            `json:"status"`
+	Labels        map[string]string `json:"labels"`
+	LastHeartbeat string            `json:"last_heartbeat,omitempty"`
+	ActiveSlots   int               `json:"active_slots"`
+}
+
+// GetAgent calls GET /api/v1/agents/:agent_name and returns the live registry entry.
+func (c *Client) GetAgent(agentName string) (AgentStatus, error) {
+	var resp AgentStatus
+	httpResp, err := c.httpClient.R().
+		SetResult(&resp).
+		Get("/api/v1/agents/" + agentName)
+	if err != nil {
+		return AgentStatus{}, fmt.Errorf("get agent request: %w", err)
+	}
+	if httpResp.IsError() {
+		return AgentStatus{}, fmt.Errorf("get agent failed: HTTP %d: %s", httpResp.StatusCode(), httpResp.String())
+	}
+	return resp, nil
+}
+

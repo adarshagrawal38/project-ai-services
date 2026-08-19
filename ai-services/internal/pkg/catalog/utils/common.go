@@ -39,6 +39,12 @@ type PodmanConfigureOptions struct {
 type OpenShiftConfigureOptions struct {
 	Namespace string
 	Timeout   time.Duration
+	BaseDir          string
+	DomainName       string // Custom domain name for self-signed certificates
+	SSLCertPath      string // Path to user-provided SSL certificate
+	SSLKeyPath       string // Path to user-provided SSL private key
+	HttpsPort        int
+	AgentGatewayPort int // 0 = disabled; >0 starts gRPC AgentGateway on that port
 }
 
 // GetCatalogPodConfig retrieves catalog pod configuration by inspecting the running pod and its containers.
@@ -154,6 +160,9 @@ func HelmUninstall(ctx context.Context, namespace, release string) error {
 	}
 
 	return helmClient.Uninstall(release, &helm.UninstallOpts{Timeout: uninstallHelmTimeout})
+	if value, ok := podEnv["AGENT_GATEWAY_PORT"]; ok {
+		config.AgentGatewayPort, _ = strconv.Atoi(value)
+	}
 }
 
 // Made with Bob

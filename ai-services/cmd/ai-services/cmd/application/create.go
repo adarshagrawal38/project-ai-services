@@ -3,6 +3,7 @@ package application
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"strings"
@@ -45,7 +46,11 @@ var (
 	templateName string
 	rawArgParams []string
 	argParams    map[string]string
+<<<<<<< ours
 	legacyCreate bool
+=======
+	agentName    string // --agent-name flag: route deployment to a specific worker agent
+>>>>>>> theirs
 
 	// podman flags.
 	skipModelDownload     bool
@@ -171,6 +176,16 @@ func initCreateCommonFlags() {
 
 	createCmd.Flags().StringVarP(&templateName, appFlags.Create.Template, "t", "", "Application template to use (required)")
 	_ = createCmd.MarkFlagRequired(appFlags.Create.Template)
+
+	createCmd.Flags().StringVar(
+		&agentName,
+		"agent-name",
+		"",
+		"Deploy on a specific remote worker agent by agent name.\n\n"+
+			"When set, the deployment is routed to the registered worker agent\n"+
+			"with this ID instead of the local Podman runtime.\n\n"+
+			"Example: --agent-name lpar-1\n",
+	)
 
 	createCmd.Flags().StringSliceVar(
 		&rawArgParams,
@@ -409,10 +424,16 @@ func createApp(appName string) error {
 		var createErr error
 		resp, createErr = appClient.CreateApplication(payload)
 
+		// Do not retry client errors (4xx) — they are deterministic failures.
+		var httpErr *catalogClient.HTTPError
+		if errors.As(createErr, &httpErr) && httpErr.StatusCode >= 400 && httpErr.StatusCode < 500 {
+			return utils.NonRetryableError(createErr)
+		}
+
 		return createErr
 	})
 	if err != nil {
-		return fmt.Errorf("failed to create application after %d retries: %w", vars.RetryCount, err)
+		return fmt.Errorf("failed to create application: %w", err)
 	}
 
 	logger.Infof("Application creation initiated (ID: %s)\n", resp.ID)
@@ -452,11 +473,23 @@ func buildCatalogPayload(appName string) (*apiModels.CreateApplicationRequest, e
 	}
 
 	// Build the payload
+	var payload *apiModels.CreateApplicationRequest
 	if isArchitecture {
-		return buildArchitecturePayload(provider, templateName, appName)
+		payload, err = buildArchitecturePayload(provider, templateName, appName)
+	} else {
+		payload, err = buildServicePayload(templateName, appName)
+	}
+	if err != nil {
+		return nil, err
 	}
 
-	return buildServicePayload(templateName, appName)
+	// When --agent-name is provided, set agent_selector so the server routes the
+	// deployment to that specific worker agent.
+	if agentName != "" {
+		payload.AgentSelector = map[string]string{"agent_name": agentName}
+	}
+
+	return payload, nil
 }
 
 // pollApplicationStatus polls the application status until it's ready or fails.
