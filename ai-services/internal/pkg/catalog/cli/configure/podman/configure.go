@@ -5,22 +5,17 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/cli/common/podman/caddy"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/cli/common/podman/deploy"
 	"github.com/project-ai-services/ai-services/internal/pkg/catalog/cli/configure"
-	"github.com/project-ai-services/ai-services/internal/pkg/catalog/client"
 	catalogconstants "github.com/project-ai-services/ai-services/internal/pkg/catalog/constants"
 	catalogUtils "github.com/project-ai-services/ai-services/internal/pkg/catalog/utils"
 	"github.com/project-ai-services/ai-services/internal/pkg/cli/helpers"
 	"github.com/project-ai-services/ai-services/internal/pkg/logger"
 	"github.com/project-ai-services/ai-services/internal/pkg/spinner"
 	"github.com/project-ai-services/ai-services/internal/pkg/utils"
-	workerdeploy "github.com/project-ai-services/ai-services/internal/pkg/worker/deploy"
-	"github.com/project-ai-services/ai-services/internal/pkg/worker/join"
-	"github.com/project-ai-services/ai-services/internal/pkg/runtime/types"
 )
 
 const (
@@ -143,32 +138,6 @@ func handlePostDeployment(ctx context.Context, caddyCtx *caddy.Context, deployCt
 	}
 
 	return nil
-}
-
-func executeWorkerDeployment(ctx context.Context, deployCtx *deploy.DeployContext, opts catalogUtils.PodmanConfigureOptions, runtimeType string) error {
-	s := spinner.New("Configure worker container...")
-	s.Start(ctx)
-
-	
-	// Register to catalog service
-	workerClient, err := client.New(ctx)
-	if err != nil {
-
-		return fmt.Errorf("failed to initialize client: %w", err)
-	}
-	resp, err := workerClient.CreateWorker(ctx, fmt.Sprintf("%s--worker", catalogconstants.CatalogAppName))
-	if err != nil {
-		return fmt.Errorf("failed to create default worker: %w", err)
-	}
-	logger.InfofCtx(ctx,"Worker '%s' registered successfully.", resp.WorkerName)
-	// Use token to join control plane
-
-	
-	
-
-	return join.Run(ctx, JoinOpts)
-
-
 }
 
 // loadCatalogParamValues prepares all necessary data for deployment including domain suffix computation.
