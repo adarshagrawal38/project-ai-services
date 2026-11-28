@@ -2796,13 +2796,13 @@ ai-services model list --status Running --runtime podman
 #### Get model details
 
 ```
-ai-services model info [name] --runtime podman
+ai-services model info [name]
 ```
 
 `[name]` is the model name. The CLI resolves it to the model ID with `GET /api/v1/models?q=<name>` (case-insensitive exact match on the name, following pagination), then calls `GET /api/v1/models/:id`. It exits with `model with name '<name>' not found` when there is no match.
 
 ```bash
-ai-services model info granite-llm --runtime podman
+ai-services model info granite-llm
 ```
 
 ```

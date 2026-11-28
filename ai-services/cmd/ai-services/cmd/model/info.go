@@ -27,7 +27,7 @@ func newInfoCmd() *cobra.Command {
 Arguments:
   [name] : Model name (required)`,
 		Example: `  # Display model information
-  ai-services model info granite-llm --runtime podman`,
+  ai-services model info granite-llm`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Once precheck passes, silence usage for any *later* internal errors.
