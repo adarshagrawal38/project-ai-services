@@ -2764,11 +2764,13 @@ ai-services model register granite-embed \
 
 ---
 
-#### List models (local + remote)
+#### List models with runtime status (local + remote)
 
 ```
-ai-services model list --runtime podman
+ai-services model ps [name]
 ```
+
+Lists the models with their pod status, in the same tabular style as `ai-services application ps`. The CLI finds the models with `GET /api/v1/models` (following pagination; with `[name]` it resolves the exact name as `model info` does), then calls `GET /api/v1/models/:id/ps` for each one. If any `ps` call fails (for example an unreachable worker), the command fails.
 
 | Flag | Short | Required | Description |
 |---|---|---|---|
@@ -2776,20 +2778,32 @@ ai-services model list --runtime podman
 | `--deployment-type` | | No | Filter by kind: `local`, `remote`. Omit for both |
 | `--provider` | `-p` | No | Filter by provider: `vllm-spyre`, `vllm-cpu`, `watsonx`, `hosted_vllm` |
 | `--status` | | No | Filter by status: `Running`, `Deploying`, `Error` (local); `connected`, `offline` (remote) |
+| `--output` | `-o` | No | Output format: `wide` adds `POD ID`, `CREATED` and `CONTAINERS` columns |
 
 ```bash
 # List all models (both local and remote)
-ai-services model list --runtime podman
+ai-services model ps
+
+# List a specific model
+ai-services model ps granite-llm
 
 # List only LLM models (local and remote)
-ai-services model list --type llm --runtime podman
+ai-services model ps --type llm
 
 # List only local models
-ai-services model list --deployment-type local --runtime podman
+ai-services model ps --deployment-type local
 
 # List only running local models
-ai-services model list --status Running --runtime podman
+ai-services model ps --status Running
 ```
+
+```
+MODEL NAME     WORKER   RUNTIME   NAMESPACE   POD NAME                  STATUS
+granite-llm    lpar-1   podman    -           granite-llm--vllm-spyre   running (healthy)
+prod-watsonx   -        -         -           -                         connected
+```
+
+Remote models have no pods, so they get a single row with `-` in the worker, runtime, namespace and pod columns and the model's own status (`connected`/`offline`) in `STATUS`. A local model with no pods yet (for example `Downloading`) is shown the same way with its model status.
 
 ---
 
@@ -2944,7 +2958,7 @@ curl -s http://litellm:4000/chat/completions \
 |---|---|---|
 | `ai-services model register [name]` | `POST /api/v1/models` (`deployment_type=local`) | Register a local model (deploys its pod) |
 | `ai-services model register [name] --deployment-type remote` | `POST /api/v1/models` (`deployment_type=remote`) | Register a remote model connector |
-| `ai-services model list` | `GET /api/v1/models` | List all models (local + remote) |
+| `ai-services model ps [name]` | `GET /api/v1/models` + `GET /api/v1/models/:id/ps` | List models (local + remote) with their pod status |
 | `ai-services model info [name]` | `GET /api/v1/models/:id` | Get full details of any model (local or remote) |
 | `ai-services model update [name]` | `PUT /api/v1/models/:id` | Update credentials of a remote model |
 | `ai-services model delete [name]` | `DELETE /api/v1/models/:id` | Undeploy/delete a model and delete its row |

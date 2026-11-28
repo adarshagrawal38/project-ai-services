@@ -18,6 +18,7 @@ func ModelCmd() *cobra.Command {
 	}
 
 	cmd.AddCommand(newInfoCmd())
+	cmd.AddCommand(newPsCmd())
 
 	return cmd
 }

@@ -20,6 +20,14 @@ type ListModelsParams struct {
 	PageSize int
 	// Search is a case-insensitive substring match on the model name.
 	Search string
+	// ComponentType filters by model role (e.g. 'llm', 'embedding', 'reranker').
+	ComponentType string
+	// DeploymentType filters by kind: 'local' or 'remote'.
+	DeploymentType string
+	// ProviderIDs filters by provider; a model matches any of the values.
+	ProviderIDs []string
+	// Status filters by model status.
+	Status string
 }
 
 // DeleteApplicationParams holds optional query parameters for deleting applications.

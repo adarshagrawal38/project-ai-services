@@ -70,3 +70,56 @@ func TestModelClient_ErrorMapping(t *testing.T) {
 		assert.Equal(t, code, httpErr.StatusCode)
 	}
 }
+
+func TestModelClient_ListModels_Filters(t *testing.T) {
+	var gotQuery map[string][]string
+	mc := newTestModelClient(t, func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.Query()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[],"pagination":{"page":1,"has_next":false}}`))
+	})
+
+	_, err := mc.ListModels(context.Background(), &ListModelsParams{
+		ComponentType:  "llm",
+		DeploymentType: "local",
+		ProviderIDs:    []string{"vllm-spyre", "watsonx"},
+		Status:         "Running",
+	})
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"llm"}, gotQuery["component_type"])
+	assert.Equal(t, []string{"local"}, gotQuery["deployment_type"])
+	assert.Equal(t, []string{"vllm-spyre", "watsonx"}, gotQuery["provider_id"])
+	assert.Equal(t, []string{"Running"}, gotQuery["status"])
+	assert.NotContains(t, gotQuery, "q")
+}
+
+func TestModelClient_GetModelPS(t *testing.T) {
+	mc := newTestModelClient(t, func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/api/v1/models/abc/ps", r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"abc","name":"granite-llm","worker_name":"lpar-1","pods":[{"pod_id":"p1","pod_name":"vllm"}]}`))
+	})
+
+	ps, err := mc.GetModelPS(context.Background(), "abc")
+	require.NoError(t, err)
+
+	assert.Equal(t, "granite-llm", ps.Name)
+	assert.Equal(t, "lpar-1", ps.WorkerName)
+	require.Len(t, ps.Pods, 1)
+	assert.Equal(t, "vllm", ps.Pods[0].PodName)
+}
+
+func TestModelClient_GetModelPS_Error(t *testing.T) {
+	mc := newTestModelClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		_, _ = w.Write([]byte(`{"error":"cannot reach worker"}`))
+	})
+
+	_, err := mc.GetModelPS(context.Background(), "abc")
+
+	var httpErr *HTTPError
+	require.True(t, errors.As(err, &httpErr))
+	assert.Equal(t, http.StatusUnprocessableEntity, httpErr.StatusCode)
+}
