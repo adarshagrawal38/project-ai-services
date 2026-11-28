@@ -1,12 +1,12 @@
 package model
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"maps"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/spf13/cobra"
 
@@ -14,6 +14,7 @@ import (
 	catalogClient "github.com/project-ai-services/ai-services/internal/pkg/catalog/client"
 	cliUtils "github.com/project-ai-services/ai-services/internal/pkg/cli/utils"
 	"github.com/project-ai-services/ai-services/internal/pkg/logger"
+	"github.com/project-ai-services/ai-services/internal/pkg/utils"
 )
 
 const emptyValue = "-"
@@ -64,7 +65,7 @@ func renderModelInfo(d *models.ModelDetail) string {
 	var b strings.Builder
 
 	field := func(key, value string) {
-		fmt.Fprintf(&b, "%-20s%s\n", key+":", orDash(value))
+		fmt.Fprintf(&b, "%-20s%s\n", key+":", cmp.Or(value, emptyValue))
 	}
 
 	field("Name", d.Name)
@@ -77,8 +78,8 @@ func renderModelInfo(d *models.ModelDetail) string {
 	field("Status", d.Status)
 	field("Message", d.Message)
 	field("Connected Services", fmt.Sprintf("%d", d.ConnectedServices))
-	field("Created At", formatTime(d.CreatedAt))
-	field("Updated At", formatTime(d.UpdatedAt))
+	field("Created At", utils.FormatTime(d.CreatedAt))
+	field("Updated At", utils.FormatTime(d.UpdatedAt))
 
 	if len(d.Params) > 0 {
 		b.WriteString("Parameters:\n")
@@ -87,7 +88,8 @@ func renderModelInfo(d *models.ModelDetail) string {
 		}
 	}
 
-	if endpoints := nonEmptyEndpoints(d.Endpoints); len(endpoints) > 0 {
+	endpoints := utils.Filter(d.Endpoints, func(e models.ModelEndpoint) bool { return e.URL != "" })
+	if len(endpoints) > 0 {
 		b.WriteString("Endpoints:\n")
 		for _, e := range endpoints {
 			fmt.Fprintf(&b, "  - %s: %s\n", e.Type, e.URL)
@@ -110,31 +112,4 @@ func workerString(d *models.ModelDetail) string {
 	}
 
 	return fmt.Sprintf("%s (%s)", d.Worker.Name, d.Worker.RuntimeType)
-}
-
-func nonEmptyEndpoints(in []models.ModelEndpoint) []models.ModelEndpoint {
-	out := make([]models.ModelEndpoint, 0, len(in))
-	for _, e := range in {
-		if e.URL != "" {
-			out = append(out, e)
-		}
-	}
-
-	return out
-}
-
-func formatTime(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-
-	return t.Format(time.RFC3339)
-}
-
-func orDash(s string) string {
-	if s == "" {
-		return emptyValue
-	}
-
-	return s
 }

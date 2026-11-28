@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/project-ai-services/ai-services/internal/pkg/constants"
@@ -888,4 +889,26 @@ func IsNotFoundError(err error) bool {
 		strings.Contains(errMsg, "no pod with name or ID") ||
 		strings.Contains(errMsg, "no such secret") ||
 		strings.Contains(errMsg, "no such volume")
+}
+
+// Filter returns a new slice containing the elements of in for which keep returns true.
+// The input slice is not modified. The result is never nil.
+func Filter[T any](in []T, keep func(T) bool) []T {
+	out := make([]T, 0, len(in))
+	for _, v := range in {
+		if keep(v) {
+			out = append(out, v)
+		}
+	}
+
+	return out
+}
+
+// FormatTime formats t as an RFC3339 string. It returns an empty string for the zero time.
+func FormatTime(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+
+	return t.Format(time.RFC3339)
 }
